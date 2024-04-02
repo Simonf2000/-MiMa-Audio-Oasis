@@ -1,11 +1,9 @@
 package com.atguigu.tingshu.album.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
-import com.atguigu.tingshu.album.mapper.BaseCategory1Mapper;
-import com.atguigu.tingshu.album.mapper.BaseCategory2Mapper;
-import com.atguigu.tingshu.album.mapper.BaseCategory3Mapper;
-import com.atguigu.tingshu.album.mapper.BaseCategoryViewMapper;
+import com.atguigu.tingshu.album.mapper.*;
 import com.atguigu.tingshu.album.service.BaseCategoryService;
+import com.atguigu.tingshu.model.album.BaseAttribute;
 import com.atguigu.tingshu.model.album.BaseCategory1;
 import com.atguigu.tingshu.model.album.BaseCategoryView;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -32,6 +30,9 @@ public class BaseCategoryServiceImpl extends ServiceImpl<BaseCategory1Mapper, Ba
 
     @Autowired
     private BaseCategoryViewMapper baseCategoryViewMapper;
+
+    @Autowired
+    private BaseAttributeMapper baseAttributeMapper;
 
     /**
      * 查询所有分类（1、2、3级分类）
@@ -103,5 +104,10 @@ public class BaseCategoryServiceImpl extends ServiceImpl<BaseCategory1Mapper, Ba
         }
         //5.返回所有一级分类JSON对象集合
         return jsonObjectList;
+    }
+
+    @Override
+    public List<BaseAttribute> getAttributeByCategory1Id(Long category1Id) {
+        return baseAttributeMapper.getAttributeByCategory1Id(category1Id);
     }
 }

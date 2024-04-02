@@ -1,6 +1,7 @@
 package com.atguigu.tingshu.album.service;
 
 import com.alibaba.fastjson.JSONObject;
+import com.atguigu.tingshu.model.album.BaseAttribute;
 import com.atguigu.tingshu.model.album.BaseCategory1;
 import com.baomidou.mybatisplus.extension.service.IService;
 
@@ -14,4 +15,6 @@ public interface BaseCategoryService extends IService<BaseCategory1> {
      * @return
      */
     List<JSONObject> getBaseCategoryList();
+
+    List<BaseAttribute> getAttributeByCategory1Id(Long category1Id);
 }

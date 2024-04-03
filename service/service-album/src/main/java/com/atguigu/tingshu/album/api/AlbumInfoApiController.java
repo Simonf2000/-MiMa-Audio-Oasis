@@ -3,7 +3,10 @@ package com.atguigu.tingshu.album.api;
 import com.atguigu.tingshu.album.service.AlbumInfoService;
 import com.atguigu.tingshu.common.result.Result;
 import com.atguigu.tingshu.common.util.AuthContextHolder;
+import com.atguigu.tingshu.query.album.AlbumInfoQuery;
 import com.atguigu.tingshu.vo.album.AlbumInfoVo;
+import com.atguigu.tingshu.vo.album.AlbumListVo;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +29,17 @@ public class AlbumInfoApiController {
         return Result.ok();
     }
 
+    @Operation(summary = "查询当前登录用户发布专辑分页列表")
+    @PostMapping("/albumInfo/findUserAlbumPage/{page}/{limit}")
+    public Result<Page<AlbumListVo>> getUserAlbumPage(@PathVariable int page,
+                                                      @PathVariable int limit,
+                                                      @RequestBody AlbumInfoQuery albumInfoQuery) {
+        Long userId = AuthContextHolder.getUserId();
+        albumInfoQuery.setUserId(userId);
+        Page<AlbumListVo> pageInfo = new Page<>(page, limit);
+        pageInfo = albumInfoService.getUserAlbumPage(albumInfoQuery, pageInfo);
+        return Result.ok(pageInfo);
+    }
 
 }
 

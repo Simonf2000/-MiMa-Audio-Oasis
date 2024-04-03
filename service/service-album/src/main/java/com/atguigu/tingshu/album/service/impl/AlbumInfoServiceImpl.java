@@ -10,8 +10,11 @@ import com.atguigu.tingshu.common.constant.SystemConstant;
 import com.atguigu.tingshu.model.album.AlbumAttributeValue;
 import com.atguigu.tingshu.model.album.AlbumInfo;
 import com.atguigu.tingshu.model.album.AlbumStat;
+import com.atguigu.tingshu.query.album.AlbumInfoQuery;
 import com.atguigu.tingshu.vo.album.AlbumAttributeValueVo;
 import com.atguigu.tingshu.vo.album.AlbumInfoVo;
+import com.atguigu.tingshu.vo.album.AlbumListVo;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,5 +69,10 @@ public class AlbumInfoServiceImpl extends ServiceImpl<AlbumInfoMapper, AlbumInfo
         albumStat.setStatType(statType);
         albumStat.setStatNum(num);
         albumStatMapper.insert(albumStat);
+    }
+
+    @Override
+    public Page<AlbumListVo> getUserAlbumPage(AlbumInfoQuery albumInfoQuery, Page<AlbumListVo> pageInfo) {
+        return albumInfoMapper.getUserAlbumPage(pageInfo,albumInfoQuery);
     }
 }

@@ -3,6 +3,7 @@ package com.atguigu.tingshu.album.api;
 import com.atguigu.tingshu.album.service.AlbumInfoService;
 import com.atguigu.tingshu.common.result.Result;
 import com.atguigu.tingshu.common.util.AuthContextHolder;
+import com.atguigu.tingshu.model.album.AlbumInfo;
 import com.atguigu.tingshu.query.album.AlbumInfoQuery;
 import com.atguigu.tingshu.vo.album.AlbumInfoVo;
 import com.atguigu.tingshu.vo.album.AlbumListVo;
@@ -48,5 +49,11 @@ public class AlbumInfoApiController {
         return Result.ok();
     }
 
+    @Operation(summary = "根据专辑ID查询专辑信息（包含专辑标签列表）")
+    @GetMapping("/albumInfo/getAlbumInfo/{id}")
+    public Result<AlbumInfo> getAlbumInfo(@PathVariable Long id) {
+        AlbumInfo albumInfo = albumInfoService.getAlbumInfo(id);
+        return Result.ok(albumInfo);
+    }
 }
 

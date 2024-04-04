@@ -104,4 +104,17 @@ public class AlbumInfoServiceImpl extends ServiceImpl<AlbumInfoMapper, AlbumInfo
         albumStatLambdaQueryWrapper.eq(AlbumStat::getAlbumId, id);
         albumStatMapper.delete(albumStatLambdaQueryWrapper);
     }
+
+    @Override
+    public AlbumInfo getAlbumInfo(Long id) {
+        AlbumInfo albumInfo = albumInfoMapper.selectById(id);
+
+        LambdaQueryWrapper<AlbumAttributeValue> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(AlbumAttributeValue::getAlbumId,id);
+        List<AlbumAttributeValue> albumAttributeValues = albumAttributeValueMapper.selectList(queryWrapper);
+        if (CollectionUtil.isNotEmpty(albumAttributeValues)) {
+            albumInfo.setAlbumAttributeValueVoList(albumAttributeValues);
+        }
+        return albumInfo;
+    }
 }

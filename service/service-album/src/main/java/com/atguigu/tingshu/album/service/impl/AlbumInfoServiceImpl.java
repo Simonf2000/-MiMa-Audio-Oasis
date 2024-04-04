@@ -5,15 +5,19 @@ import cn.hutool.core.collection.CollectionUtil;
 import com.atguigu.tingshu.album.mapper.AlbumAttributeValueMapper;
 import com.atguigu.tingshu.album.mapper.AlbumInfoMapper;
 import com.atguigu.tingshu.album.mapper.AlbumStatMapper;
+import com.atguigu.tingshu.album.mapper.TrackInfoMapper;
 import com.atguigu.tingshu.album.service.AlbumInfoService;
 import com.atguigu.tingshu.common.constant.SystemConstant;
+import com.atguigu.tingshu.common.execption.GuiguException;
 import com.atguigu.tingshu.model.album.AlbumAttributeValue;
 import com.atguigu.tingshu.model.album.AlbumInfo;
 import com.atguigu.tingshu.model.album.AlbumStat;
+import com.atguigu.tingshu.model.album.TrackInfo;
 import com.atguigu.tingshu.query.album.AlbumInfoQuery;
 import com.atguigu.tingshu.vo.album.AlbumAttributeValueVo;
 import com.atguigu.tingshu.vo.album.AlbumInfoVo;
 import com.atguigu.tingshu.vo.album.AlbumListVo;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +40,9 @@ public class AlbumInfoServiceImpl extends ServiceImpl<AlbumInfoMapper, AlbumInfo
 
     @Autowired
     private AlbumStatMapper albumStatMapper;
+
+    @Autowired
+    private TrackInfoMapper trackInfoMapper;
 
     @Transactional(rollbackFor = Exception.class)
     @Override
@@ -73,6 +80,28 @@ public class AlbumInfoServiceImpl extends ServiceImpl<AlbumInfoMapper, AlbumInfo
 
     @Override
     public Page<AlbumListVo> getUserAlbumPage(AlbumInfoQuery albumInfoQuery, Page<AlbumListVo> pageInfo) {
-        return albumInfoMapper.getUserAlbumPage(pageInfo,albumInfoQuery);
+        return albumInfoMapper.getUserAlbumPage(pageInfo, albumInfoQuery);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void removeAlbumInfo(Long id) {
+        LambdaQueryWrapper<TrackInfo> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(TrackInfo::getAlbumId, id);
+        queryWrapper.last("limit 1");
+        Long count = trackInfoMapper.selectCount(queryWrapper);
+        if (count > 0) {
+            throw new GuiguException(500, "该专辑下已关联声音");
+        }
+
+        albumInfoMapper.deleteById(id);
+
+        LambdaQueryWrapper<AlbumAttributeValue> albumAttributeValueLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        albumAttributeValueLambdaQueryWrapper.eq(AlbumAttributeValue::getAlbumId, id);
+        albumAttributeValueMapper.delete(albumAttributeValueLambdaQueryWrapper);
+
+        LambdaQueryWrapper<AlbumStat> albumStatLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        albumStatLambdaQueryWrapper.eq(AlbumStat::getAlbumId, id);
+        albumStatMapper.delete(albumStatLambdaQueryWrapper);
     }
 }

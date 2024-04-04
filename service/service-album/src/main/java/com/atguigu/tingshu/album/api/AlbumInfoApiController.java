@@ -41,5 +41,12 @@ public class AlbumInfoApiController {
         return Result.ok(pageInfo);
     }
 
+    @Operation(summary = "根据专辑ID删除专辑")
+    @DeleteMapping("/albumInfo/removeAlbumInfo/{id}")
+    public Result removeAlbumInfo(@PathVariable Long id){
+        albumInfoService.removeAlbumInfo(id);
+        return Result.ok();
+    }
+
 }
 

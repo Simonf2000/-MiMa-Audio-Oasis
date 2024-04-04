@@ -110,11 +110,34 @@ public class AlbumInfoServiceImpl extends ServiceImpl<AlbumInfoMapper, AlbumInfo
         AlbumInfo albumInfo = albumInfoMapper.selectById(id);
 
         LambdaQueryWrapper<AlbumAttributeValue> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(AlbumAttributeValue::getAlbumId,id);
+        queryWrapper.eq(AlbumAttributeValue::getAlbumId, id);
         List<AlbumAttributeValue> albumAttributeValues = albumAttributeValueMapper.selectList(queryWrapper);
         if (CollectionUtil.isNotEmpty(albumAttributeValues)) {
             albumInfo.setAlbumAttributeValueVoList(albumAttributeValues);
         }
         return albumInfo;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateAlbumInfo(AlbumInfo albumInfo) {
+        //1.修改专辑信息
+        this.updateById(albumInfo);
+
+        LambdaQueryWrapper<AlbumAttributeValue> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(AlbumAttributeValue::getAlbumId, albumInfo.getId());
+        albumAttributeValueMapper.delete(queryWrapper);
+
+
+        //2.修改专辑标签
+        List<AlbumAttributeValue> albumAttributeValueVoList = albumInfo.getAlbumAttributeValueVoList();
+        if (CollectionUtil.isNotEmpty(albumAttributeValueVoList)) {
+
+            for (AlbumAttributeValue albumAttributeValue : albumAttributeValueVoList) {
+                albumAttributeValue.setAlbumId(albumInfo.getId());
+                albumAttributeValueMapper.insert(albumAttributeValue);
+            }
+
+        }
     }
 }

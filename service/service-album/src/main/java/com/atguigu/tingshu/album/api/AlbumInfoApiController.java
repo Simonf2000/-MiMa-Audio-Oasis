@@ -55,5 +55,13 @@ public class AlbumInfoApiController {
         AlbumInfo albumInfo = albumInfoService.getAlbumInfo(id);
         return Result.ok(albumInfo);
     }
+
+    @Operation(summary = "更新专辑信息")
+    @PutMapping("/albumInfo/updateAlbumInfo/{id}")
+    public Result updateAlbumInfo(@PathVariable Long id, @RequestBody AlbumInfo albumInfo) {
+        albumInfo.setId(id);
+        albumInfoService.updateAlbumInfo(albumInfo);
+        return Result.ok();
+    }
 }
 

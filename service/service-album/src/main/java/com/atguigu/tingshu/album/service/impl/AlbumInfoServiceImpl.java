@@ -140,4 +140,20 @@ public class AlbumInfoServiceImpl extends ServiceImpl<AlbumInfoMapper, AlbumInfo
 
         }
     }
+
+    @Override
+    public List<AlbumInfo> getUserAllAlbumList(Long userId) {
+        //1.构建查询条件对象
+        LambdaQueryWrapper<AlbumInfo> queryWrapper = new LambdaQueryWrapper<>();
+        //1.2.设置查询条件：用户ID
+        queryWrapper.eq(AlbumInfo::getUserId, userId);
+        queryWrapper.eq(AlbumInfo::getStatus, SystemConstant.ALBUM_STATUS_PASS);
+        //1.3.设置排序字段
+        queryWrapper.orderByDesc(AlbumInfo::getId);
+        //1.4.设置查询字段 设置select部分
+        queryWrapper.select(AlbumInfo::getId, AlbumInfo::getAlbumTitle);
+        //1.5.设置限制返回记录数 设置 limit
+        queryWrapper.last("limit 100");
+        return albumInfoMapper.selectList(queryWrapper);
+    }
 }

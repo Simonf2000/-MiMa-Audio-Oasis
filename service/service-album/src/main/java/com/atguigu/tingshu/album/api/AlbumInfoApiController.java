@@ -13,6 +13,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Tag(name = "专辑管理")
 @RestController
 @RequestMapping("api/album")
@@ -62,6 +64,14 @@ public class AlbumInfoApiController {
         albumInfo.setId(id);
         albumInfoService.updateAlbumInfo(albumInfo);
         return Result.ok();
+    }
+
+    @Operation(summary = "查询当前用户发布所有专辑列表")
+    @GetMapping("/albumInfo/findUserAllAlbumList")
+    public Result<List<AlbumInfo>> getUserAllAlbumList() {
+        Long userId = AuthContextHolder.getUserId();
+        List<AlbumInfo> list = albumInfoService.getUserAllAlbumList(userId);
+        return Result.ok(list);
     }
 }
 

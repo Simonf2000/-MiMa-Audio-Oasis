@@ -63,10 +63,10 @@ public class AlbumInfoServiceImpl extends ServiceImpl<AlbumInfoMapper, AlbumInfo
                 albumAttributeValueMapper.insert(albumAttributeValue);
             }
         }
-        this.saveAlbumStat(albumId, SystemConstant.ALBUM_STAT_PLAY, 1);
-        this.saveAlbumStat(albumId, SystemConstant.ALBUM_STAT_SUBSCRIBE, 1);
-        this.saveAlbumStat(albumId, SystemConstant.ALBUM_STAT_BUY, 1);
-        this.saveAlbumStat(albumId, SystemConstant.ALBUM_STAT_COMMENT, 1);
+        this.saveAlbumStat(albumId, SystemConstant.ALBUM_STAT_PLAY, 0);
+        this.saveAlbumStat(albumId, SystemConstant.ALBUM_STAT_SUBSCRIBE, 0);
+        this.saveAlbumStat(albumId, SystemConstant.ALBUM_STAT_BUY, 0);
+        this.saveAlbumStat(albumId, SystemConstant.ALBUM_STAT_COMMENT, 0);
     }
 
     @Override

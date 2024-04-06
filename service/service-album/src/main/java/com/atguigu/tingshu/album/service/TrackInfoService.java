@@ -10,4 +10,8 @@ import java.util.Map;
 public interface TrackInfoService extends IService<TrackInfo> {
 
     Map<String, String> uploadTrack(MultipartFile trackFile);
+
+    void saveTrackInfo(Long userId, TrackInfoVo trackInfoVo);
+
+    void saveTrackStat(Long trackId, String statType, int num);
 }

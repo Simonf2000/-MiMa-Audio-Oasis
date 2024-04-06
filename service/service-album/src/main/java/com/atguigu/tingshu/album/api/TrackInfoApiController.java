@@ -27,5 +27,15 @@ public class TrackInfoApiController {
         Map<String, String> map = trackInfoService.uploadTrack(trackFile);
         return Result.ok(map);
     }
+
+    @Operation(summary = "保存声音")
+    @PostMapping("/trackInfo/saveTrackInfo")
+    public Result saveTrackInfo(@RequestBody TrackInfoVo trackInfoVo){
+        //1.获取当前用户ID
+        Long userId = AuthContextHolder.getUserId();
+        //2.调用业务逻辑新增声音
+        trackInfoService.saveTrackInfo(userId, trackInfoVo);
+        return Result.ok();
+    }
 }
 

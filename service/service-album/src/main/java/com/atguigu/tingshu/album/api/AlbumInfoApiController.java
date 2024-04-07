@@ -1,6 +1,7 @@
 package com.atguigu.tingshu.album.api;
 
 import com.atguigu.tingshu.album.service.AlbumInfoService;
+import com.atguigu.tingshu.common.login.GuiGuLogin;
 import com.atguigu.tingshu.common.result.Result;
 import com.atguigu.tingshu.common.util.AuthContextHolder;
 import com.atguigu.tingshu.model.album.AlbumInfo;
@@ -32,6 +33,7 @@ public class AlbumInfoApiController {
         return Result.ok();
     }
 
+    @GuiGuLogin
     @Operation(summary = "查询当前登录用户发布专辑分页列表")
     @PostMapping("/albumInfo/findUserAlbumPage/{page}/{limit}")
     public Result<Page<AlbumListVo>> getUserAlbumPage(@PathVariable int page,

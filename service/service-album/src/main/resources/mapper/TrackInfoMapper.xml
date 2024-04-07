@@ -32,5 +32,13 @@
         order by ti.id desc
     </select>
 
+    <!--    void updateOrderNum(Long albumId, Integer orderNum);-->
+    <update id="updateOrderNum">
+        UPDATE tingshu_album.track_info
+        set order_num = order_num - 1
+        where album_id = #{albumId}
+          and order_num > #{orderNum}
+    </update>
+
 </mapper>
 

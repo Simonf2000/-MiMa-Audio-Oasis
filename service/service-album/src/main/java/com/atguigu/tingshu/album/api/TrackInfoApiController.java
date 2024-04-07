@@ -55,5 +55,12 @@ public class TrackInfoApiController {
         PageInfo = trackInfoService.getUserTrackByPage(PageInfo, trackInfoQuery);
         return Result.ok(PageInfo);
     }
+
+    @Operation(summary = "根据声音ID删除声音")
+    @DeleteMapping("/trackInfo/removeTrackInfo/{id}")
+    public Result removeTrackInfo(@PathVariable Long id){
+        trackInfoService.removeTrackInfo(id);
+        return Result.ok();
+    }
 }
 

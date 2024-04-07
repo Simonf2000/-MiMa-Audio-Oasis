@@ -17,6 +17,7 @@ import com.atguigu.tingshu.query.album.TrackInfoQuery;
 import com.atguigu.tingshu.vo.album.TrackInfoVo;
 import com.atguigu.tingshu.vo.album.TrackListVo;
 import com.atguigu.tingshu.vo.album.TrackMediaInfoVo;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.qcloud.vod.VodUploadClient;
@@ -125,5 +126,25 @@ public class TrackInfoServiceImpl extends ServiceImpl<TrackInfoMapper, TrackInfo
     @Override
     public Page<TrackListVo> getUserTrackByPage(Page<TrackListVo> pageInfo, TrackInfoQuery trackInfoQuery) {
         return trackInfoMapper.getUserTrackByPage(pageInfo, trackInfoQuery);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void removeTrackInfo(Long id) {
+        //获取要被删除声音信息 得到 当前声音序号
+        TrackInfo trackInfo = trackInfoMapper.selectById(id);
+        Long albumId= trackInfo.getAlbumId();
+        Integer orderNum = trackInfo.getOrderNum();
+        //删除声音记录
+        trackInfoMapper.deleteById(id);
+
+        //删除声音统计信息
+        LambdaQueryWrapper<TrackStat> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(TrackStat::getTrackId, id);
+        trackStatMapper.delete(queryWrapper);
+        //根据序号修改比当前声音序号大的声音序号
+        trackInfoMapper.updateOrderNum(albumId, orderNum);
+        vodService.deleteMedia(trackInfo.getMediaFileId());
+
     }
 }

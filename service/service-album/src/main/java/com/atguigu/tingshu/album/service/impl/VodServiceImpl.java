@@ -64,4 +64,9 @@ public class VodServiceImpl implements VodService {
         }
         return null;
     }
+
+    @Override
+    public void deleteMedia(String mediaFileId) {
+
+    }
 }

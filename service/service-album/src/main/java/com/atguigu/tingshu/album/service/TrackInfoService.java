@@ -21,4 +21,6 @@ public interface TrackInfoService extends IService<TrackInfo> {
     Page<TrackListVo> getUserTrackByPage(Page<TrackListVo> pageInfo, TrackInfoQuery trackInfoQuery);
 
     void removeTrackInfo(Long id);
+
+    void updateTrackInfo(TrackInfo trackInfo);
 }

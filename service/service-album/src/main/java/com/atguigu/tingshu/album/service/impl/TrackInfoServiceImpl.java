@@ -133,7 +133,7 @@ public class TrackInfoServiceImpl extends ServiceImpl<TrackInfoMapper, TrackInfo
     public void removeTrackInfo(Long id) {
         //获取要被删除声音信息 得到 当前声音序号
         TrackInfo trackInfo = trackInfoMapper.selectById(id);
-        Long albumId= trackInfo.getAlbumId();
+        Long albumId = trackInfo.getAlbumId();
         Integer orderNum = trackInfo.getOrderNum();
         //删除声音记录
         trackInfoMapper.deleteById(id);
@@ -145,6 +145,27 @@ public class TrackInfoServiceImpl extends ServiceImpl<TrackInfoMapper, TrackInfo
         //根据序号修改比当前声音序号大的声音序号
         trackInfoMapper.updateOrderNum(albumId, orderNum);
         vodService.deleteMedia(trackInfo.getMediaFileId());
+    }
 
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public void updateTrackInfo(TrackInfo trackInfo) {
+        //1.根据声音ID查询声音信息
+        TrackInfo oldtrackInfo = trackInfoMapper.selectById(trackInfo.getId());
+        //2.判断音频信息是否发生变化
+        String oldMediaFileId = oldtrackInfo.getMediaFileId();
+
+        if (!oldMediaFileId.equals(trackInfo.getMediaFileId())) {
+            //3.调用腾讯云点播平台获取最新音频文件信息 更新 声音中音频信息
+            TrackMediaInfoVo mediaInfo = vodService.getMediaInfo(trackInfo.getMediaFileId());
+            if (mediaInfo != null) {
+                trackInfo.setMediaDuration(BigDecimal.valueOf(mediaInfo.getDuration()));
+                trackInfo.setMediaType(mediaInfo.getType());
+                trackInfo.setMediaSize(mediaInfo.getSize());
+                vodService.deleteMedia(oldMediaFileId);
+            }
+        }
+        //更新声音信息
+        trackInfoMapper.updateById(trackInfo);
     }
 }

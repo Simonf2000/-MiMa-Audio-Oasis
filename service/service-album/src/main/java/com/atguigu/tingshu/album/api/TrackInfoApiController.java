@@ -3,6 +3,7 @@ package com.atguigu.tingshu.album.api;
 import com.atguigu.tingshu.album.service.TrackInfoService;
 import com.atguigu.tingshu.common.result.Result;
 import com.atguigu.tingshu.common.util.AuthContextHolder;
+import com.atguigu.tingshu.model.album.TrackInfo;
 import com.atguigu.tingshu.query.album.TrackInfoQuery;
 import com.atguigu.tingshu.vo.album.TrackInfoVo;
 import com.atguigu.tingshu.vo.album.TrackListVo;
@@ -61,6 +62,13 @@ public class TrackInfoApiController {
     public Result removeTrackInfo(@PathVariable Long id){
         trackInfoService.removeTrackInfo(id);
         return Result.ok();
+    }
+
+    @Operation(summary = "根据声音ID查询声音信息")
+    @GetMapping("/trackInfo/getTrackInfo/{id}")
+    public Result<TrackInfo> getTrackInfo(@PathVariable Long id) {
+        TrackInfo trackInfo = trackInfoService.getById(id);
+        return Result.ok(trackInfo);
     }
 }
 

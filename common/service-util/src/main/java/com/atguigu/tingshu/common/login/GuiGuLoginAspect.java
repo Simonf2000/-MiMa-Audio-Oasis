@@ -18,6 +18,8 @@ import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * Created with IntelliJ IDEA.
  *
@@ -74,6 +76,10 @@ public class GuiGuLoginAspect {
         }
 
         if (userInfoVo != null) {
+            Long ttlHours = redisTemplate.getExpire(loginKey, TimeUnit.HOURS);
+            if (ttlHours <= 12) {
+                redisTemplate.expire(loginKey,RedisConstant.USER_LOGIN_KEY_TIMEOUT,TimeUnit.SECONDS);
+            }
             AuthContextHolder.setUserId(userInfoVo.getId());
         }
 

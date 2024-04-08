@@ -98,6 +98,15 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         }
         return null;
     }
+
+    @Override
+    public void updateUser(Long userId, UserInfoVo userInfoVo) {
+        UserInfo userInfo = new UserInfo();
+        userInfo.setId(userId);
+        userInfo.setNickname(userInfoVo.getNickname());
+        userInfo.setAvatarUrl(userInfoVo.getAvatarUrl());
+        userInfoMapper.updateById(userInfo);
+    }
 }
 
 

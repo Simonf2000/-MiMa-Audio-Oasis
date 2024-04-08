@@ -25,6 +25,7 @@ public class AlbumInfoApiController {
     @Autowired
     private AlbumInfoService albumInfoService;
 
+    @GuiGuLogin
     @Operation(summary = "保存专辑")
     @PostMapping("/albumInfo/saveAlbumInfo")
     public Result saveAlbumInfo(@RequestBody AlbumInfoVo albumInfoVo) {
@@ -48,7 +49,7 @@ public class AlbumInfoApiController {
 
     @Operation(summary = "根据专辑ID删除专辑")
     @DeleteMapping("/albumInfo/removeAlbumInfo/{id}")
-    public Result removeAlbumInfo(@PathVariable Long id){
+    public Result removeAlbumInfo(@PathVariable Long id) {
         albumInfoService.removeAlbumInfo(id);
         return Result.ok();
     }

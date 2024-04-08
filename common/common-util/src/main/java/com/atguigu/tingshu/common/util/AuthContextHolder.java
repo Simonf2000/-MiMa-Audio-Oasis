@@ -12,9 +12,8 @@ public class AuthContextHolder {
     }
 
     public static Long getUserId() {
-        //TODO 没有认证前暂时固定为1，后续改为动态
         //return userId.get();
-        return 1L;
+        return userId.get();
     }
 
     public static void removeUserId() {

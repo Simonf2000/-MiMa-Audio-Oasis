@@ -1,8 +1,26 @@
 package com.atguigu.tingshu.search.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.core.lang.Assert;
+import cn.hutool.core.util.RandomUtil;
+import com.atguigu.tingshu.album.AlbumFeignClient;
+import com.atguigu.tingshu.model.album.AlbumAttributeValue;
+import com.atguigu.tingshu.model.album.AlbumInfo;
+import com.atguigu.tingshu.model.album.BaseCategoryView;
+import com.atguigu.tingshu.model.search.AlbumInfoIndex;
+import com.atguigu.tingshu.model.search.AttributeValueIndex;
+import com.atguigu.tingshu.search.AlbumInfoIndexRepository;
 import com.atguigu.tingshu.search.service.SearchService;
+import com.atguigu.tingshu.user.client.UserFeignClient;
+import com.atguigu.tingshu.vo.user.UserInfoVo;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.stream.Collectors;
 
 
 @Slf4j
@@ -10,5 +28,73 @@ import org.springframework.stereotype.Service;
 @SuppressWarnings({"all"})
 public class SearchServiceImpl implements SearchService {
 
+    @Autowired
+    private AlbumFeignClient albumFeignClient;
 
+    @Autowired
+    private UserFeignClient userFeignClient;
+
+    @Autowired
+    private AlbumInfoIndexRepository albumInfoIndexRepository;
+
+
+    /**
+     * 将指定专辑封装专辑索引库文档对象，完成文档信息
+     *
+     * @param albumId
+     */
+    @Override
+    public void upperAlbum(Long albumId) {
+        //1.远程调用专辑服务，获取专辑信息（包含专辑标签列表），属性拷贝到索引库文档对象
+        //1.1 远程调用专辑服务
+        AlbumInfo albumInfo = albumFeignClient.getAlbumInfo(albumId).getData();
+        Assert.notNull(albumInfo, "专辑{}信息为空", albumId);
+
+        //1.2 封装专辑文档对象专辑信息
+        AlbumInfoIndex albumInfoIndex = BeanUtil.copyProperties(albumInfo, AlbumInfoIndex.class);
+
+        //1.3 封装专辑文档对象专辑标签列表
+        List<AlbumAttributeValue> albumAttributeValueVoList = albumInfo.getAlbumAttributeValueVoList();
+        if (CollectionUtil.isNotEmpty(albumAttributeValueVoList)) {
+            List<AttributeValueIndex> attributeValueIndexList
+                    = albumAttributeValueVoList
+                    .stream()
+                    .map(albumAttributeValue -> BeanUtil.copyProperties(albumAttributeValue, AttributeValueIndex.class))
+                    .collect(Collectors.toList());
+            albumInfoIndex.setAttributeValueIndexList(attributeValueIndexList);
+        }
+
+        //2.远程调用专辑服务,获取分类信息，封装三级分类ID
+        BaseCategoryView categoryView = albumFeignClient.getCategoryView(albumInfo.getCategory3Id()).getData();
+        Assert.notNull(categoryView, "分类{}信息为空", albumInfo.getCategory3Id());
+        albumInfoIndex.setCategory1Id(categoryView.getCategory1Id());
+        albumInfoIndex.setCategory2Id(categoryView.getCategory2Id());
+
+        //3.远程调用用户服务，获取主播信息，封装主播名称
+        UserInfoVo userInfoVo = userFeignClient.getUserInfoVo(albumInfo.getUserId()).getData();
+        Assert.notNull(userInfoVo, "主播{}信息为空", albumInfo.getUserId());
+        albumInfoIndex.setAnnouncerName(userInfoVo.getNickname());
+
+        //4.TODO 为了方便进行检索测试，随机产生专辑统计数值 封装专辑统计信息
+        //4.1 随机产生四个数值作为统计值
+        int num1 = RandomUtil.randomInt(500, 2000);
+        int num2 = RandomUtil.randomInt(500, 1500);
+        int num3 = RandomUtil.randomInt(500, 1000);
+        int num4 = RandomUtil.randomInt(500, 1000);
+        albumInfoIndex.setPlayStatNum(num1);
+        albumInfoIndex.setSubscribeStatNum(num2);
+        albumInfoIndex.setBuyStatNum(num3);
+        albumInfoIndex.setCommentStatNum(num4);
+
+        //4.2 基于统计值计算当前文档热度 统计量*动态权重
+        BigDecimal bigDecimal1 = new BigDecimal("0.1").multiply(new BigDecimal(num1));
+        BigDecimal bigDecimal2 = new BigDecimal("0.2").multiply(new BigDecimal(num2));
+        BigDecimal bigDecimal3 = new BigDecimal("0.3").multiply(new BigDecimal(num3));
+        BigDecimal bigDecimal4 = new BigDecimal("0.4").multiply(new BigDecimal(num4));
+        BigDecimal hotScore = bigDecimal1.add(bigDecimal2).add(bigDecimal3).add(bigDecimal4);
+        albumInfoIndex.setHotScore(hotScore.doubleValue());
+
+        //5.调用文档持久层接口保存专辑
+        albumInfoIndexRepository.save(albumInfoIndex);
+    }
 }

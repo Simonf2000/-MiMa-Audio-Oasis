@@ -110,4 +110,9 @@ public class BaseCategoryServiceImpl extends ServiceImpl<BaseCategory1Mapper, Ba
     public List<BaseAttribute> getAttributeByCategory1Id(Long category1Id) {
         return baseAttributeMapper.getAttributeByCategory1Id(category1Id);
     }
+
+    @Override
+    public BaseCategoryView getCategoryView(Long category3Id) {
+        return baseCategoryViewMapper.selectById(category3Id);
+    }
 }

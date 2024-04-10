@@ -20,6 +20,8 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
 
 
@@ -37,6 +39,9 @@ public class SearchServiceImpl implements SearchService {
     @Autowired
     private AlbumInfoIndexRepository albumInfoIndexRepository;
 
+    @Autowired
+    private ThreadPoolExecutor threadPoolExecutor;
+
 
     /**
      * 将指定专辑封装专辑索引库文档对象，完成文档信息
@@ -45,35 +50,46 @@ public class SearchServiceImpl implements SearchService {
      */
     @Override
     public void upperAlbum(Long albumId) {
-        //1.远程调用专辑服务，获取专辑信息（包含专辑标签列表），属性拷贝到索引库文档对象
-        //1.1 远程调用专辑服务
-        AlbumInfo albumInfo = albumFeignClient.getAlbumInfo(albumId).getData();
-        Assert.notNull(albumInfo, "专辑{}信息为空", albumId);
+        AlbumInfoIndex albumInfoIndex = new AlbumInfoIndex();
+        CompletableFuture<AlbumInfo> albumInfoCompletableFuture = CompletableFuture.supplyAsync(() -> {
+            //1.远程调用专辑服务，获取专辑信息（包含专辑标签列表），属性拷贝到索引库文档对象
+            //1.1 远程调用专辑服务
+            AlbumInfo albumInfo = albumFeignClient.getAlbumInfo(albumId).getData();
+            Assert.notNull(albumInfo, "专辑{}信息为空", albumId);
 
-        //1.2 封装专辑文档对象专辑信息
-        AlbumInfoIndex albumInfoIndex = BeanUtil.copyProperties(albumInfo, AlbumInfoIndex.class);
+            //1.2 封装专辑文档对象专辑信息
+            BeanUtil.copyProperties(albumInfo, albumInfoIndex);
 
-        //1.3 封装专辑文档对象专辑标签列表
-        List<AlbumAttributeValue> albumAttributeValueVoList = albumInfo.getAlbumAttributeValueVoList();
-        if (CollectionUtil.isNotEmpty(albumAttributeValueVoList)) {
-            List<AttributeValueIndex> attributeValueIndexList
-                    = albumAttributeValueVoList
-                    .stream()
-                    .map(albumAttributeValue -> BeanUtil.copyProperties(albumAttributeValue, AttributeValueIndex.class))
-                    .collect(Collectors.toList());
-            albumInfoIndex.setAttributeValueIndexList(attributeValueIndexList);
-        }
+            //1.3 封装专辑文档对象专辑标签列表
+            List<AlbumAttributeValue> albumAttributeValueVoList = albumInfo.getAlbumAttributeValueVoList();
+            if (CollectionUtil.isNotEmpty(albumAttributeValueVoList)) {
+                List<AttributeValueIndex> attributeValueIndexList
+                        = albumAttributeValueVoList
+                        .stream()
+                        .map(albumAttributeValue -> BeanUtil.copyProperties(albumAttributeValue, AttributeValueIndex.class))
+                        .collect(Collectors.toList());
+                albumInfoIndex.setAttributeValueIndexList(attributeValueIndexList);
+            }
+            return albumInfo;
+        }, threadPoolExecutor);
 
-        //2.远程调用专辑服务,获取分类信息，封装三级分类ID
-        BaseCategoryView categoryView = albumFeignClient.getCategoryView(albumInfo.getCategory3Id()).getData();
-        Assert.notNull(categoryView, "分类{}信息为空", albumInfo.getCategory3Id());
-        albumInfoIndex.setCategory1Id(categoryView.getCategory1Id());
-        albumInfoIndex.setCategory2Id(categoryView.getCategory2Id());
+        CompletableFuture<Void> categoryCompletableFuture = albumInfoCompletableFuture.thenAcceptAsync(albumInfo -> {
+            //2.远程调用专辑服务,获取分类信息，封装三级分类ID
+            BaseCategoryView categoryView = albumFeignClient.getCategoryView(albumInfo.getCategory3Id()).getData();
+            Assert.notNull(categoryView, "分类{}信息为空", albumInfo.getCategory3Id());
+            albumInfoIndex.setCategory1Id(categoryView.getCategory1Id());
+            albumInfoIndex.setCategory2Id(categoryView.getCategory2Id());
+        }, threadPoolExecutor);
 
-        //3.远程调用用户服务，获取主播信息，封装主播名称
-        UserInfoVo userInfoVo = userFeignClient.getUserInfoVo(albumInfo.getUserId()).getData();
-        Assert.notNull(userInfoVo, "主播{}信息为空", albumInfo.getUserId());
-        albumInfoIndex.setAnnouncerName(userInfoVo.getNickname());
+
+        CompletableFuture<Void> userInfoCompletableFuture = albumInfoCompletableFuture.thenAcceptAsync(albumInfo -> {
+            //3.远程调用用户服务，获取主播信息，封装主播名称
+            UserInfoVo userInfoVo = userFeignClient.getUserInfoVo(albumInfo.getUserId()).getData();
+            Assert.notNull(userInfoVo, "主播{}信息为空", albumInfo.getUserId());
+            albumInfoIndex.setAnnouncerName(userInfoVo.getNickname());
+
+        }, threadPoolExecutor);
+
 
         //4.TODO 为了方便进行检索测试，随机产生专辑统计数值 封装专辑统计信息
         //4.1 随机产生四个数值作为统计值
@@ -94,7 +110,13 @@ public class SearchServiceImpl implements SearchService {
         BigDecimal hotScore = bigDecimal1.add(bigDecimal2).add(bigDecimal3).add(bigDecimal4);
         albumInfoIndex.setHotScore(hotScore.doubleValue());
 
+        CompletableFuture.allOf(
+                albumInfoCompletableFuture,
+                categoryCompletableFuture,
+                userInfoCompletableFuture
+        ).join();
         //5.调用文档持久层接口保存专辑
         albumInfoIndexRepository.save(albumInfoIndex);
+        System.out.println(Thread.currentThread().getName()+"主线程执行");
     }
 }

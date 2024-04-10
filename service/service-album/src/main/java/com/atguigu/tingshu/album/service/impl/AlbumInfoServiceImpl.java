@@ -7,8 +7,10 @@ import com.atguigu.tingshu.album.mapper.AlbumInfoMapper;
 import com.atguigu.tingshu.album.mapper.AlbumStatMapper;
 import com.atguigu.tingshu.album.mapper.TrackInfoMapper;
 import com.atguigu.tingshu.album.service.AlbumInfoService;
+import com.atguigu.tingshu.common.constant.KafkaConstant;
 import com.atguigu.tingshu.common.constant.SystemConstant;
 import com.atguigu.tingshu.common.execption.GuiguException;
+import com.atguigu.tingshu.common.service.KafkaService;
 import com.atguigu.tingshu.model.album.AlbumAttributeValue;
 import com.atguigu.tingshu.model.album.AlbumInfo;
 import com.atguigu.tingshu.model.album.AlbumStat;
@@ -44,6 +46,9 @@ public class AlbumInfoServiceImpl extends ServiceImpl<AlbumInfoMapper, AlbumInfo
     @Autowired
     private TrackInfoMapper trackInfoMapper;
 
+    @Autowired
+    private KafkaService kafkaService;
+
     @Transactional(rollbackFor = Exception.class)
     @Override
     public void saveAlbumInfo(Long userId, AlbumInfoVo albumInfoVo) {
@@ -67,6 +72,12 @@ public class AlbumInfoServiceImpl extends ServiceImpl<AlbumInfoMapper, AlbumInfo
         this.saveAlbumStat(albumId, SystemConstant.ALBUM_STAT_SUBSCRIBE, 0);
         this.saveAlbumStat(albumId, SystemConstant.ALBUM_STAT_BUY, 0);
         this.saveAlbumStat(albumId, SystemConstant.ALBUM_STAT_COMMENT, 0);
+
+        if ("1".equals(albumInfo.getIsOpen())) {
+            kafkaService.sendKafkaMessage(KafkaConstant.QUEUE_ALBUM_UPPER, albumId.toString());
+        } else {
+            kafkaService.sendKafkaMessage(KafkaConstant.QUEUE_ALBUM_LOWER, albumId.toString());
+        }
     }
 
     @Override
@@ -103,6 +114,8 @@ public class AlbumInfoServiceImpl extends ServiceImpl<AlbumInfoMapper, AlbumInfo
         LambdaQueryWrapper<AlbumStat> albumStatLambdaQueryWrapper = new LambdaQueryWrapper<>();
         albumStatLambdaQueryWrapper.eq(AlbumStat::getAlbumId, id);
         albumStatMapper.delete(albumStatLambdaQueryWrapper);
+
+        kafkaService.sendKafkaMessage(KafkaConstant.QUEUE_ALBUM_LOWER, id.toString());
     }
 
     @Override
@@ -138,6 +151,12 @@ public class AlbumInfoServiceImpl extends ServiceImpl<AlbumInfoMapper, AlbumInfo
                 albumAttributeValueMapper.insert(albumAttributeValue);
             }
 
+        }
+
+        if ("1".equals(albumInfo.getIsOpen())) {
+            kafkaService.sendKafkaMessage(KafkaConstant.QUEUE_ALBUM_UPPER, albumInfo.getId().toString());
+        } else {
+            kafkaService.sendKafkaMessage(KafkaConstant.QUEUE_ALBUM_LOWER, albumInfo.getId().toString());
         }
     }
 

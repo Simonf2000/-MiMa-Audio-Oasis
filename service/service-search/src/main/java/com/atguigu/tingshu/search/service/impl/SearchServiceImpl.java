@@ -117,6 +117,11 @@ public class SearchServiceImpl implements SearchService {
         ).join();
         //5.调用文档持久层接口保存专辑
         albumInfoIndexRepository.save(albumInfoIndex);
-        System.out.println(Thread.currentThread().getName()+"主线程执行");
+        System.out.println(Thread.currentThread().getName() + "主线程执行");
+    }
+
+    @Override
+    public void lowerAlbum(Long albumId) {
+        albumInfoIndexRepository.deleteById(albumId);
     }
 }

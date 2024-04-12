@@ -17,5 +17,5 @@ public interface SearchService {
 
     SearchRequest buildDSL(AlbumIndexQuery albumIndexQuery);
 
-    AlbumSearchResponseVo parseResult(SearchResponse<AlbumInfoIndex> searchResponse);
+    AlbumSearchResponseVo parseResult(SearchResponse<AlbumInfoIndex> searchResponse, AlbumIndexQuery albumIndexQuery);
 }

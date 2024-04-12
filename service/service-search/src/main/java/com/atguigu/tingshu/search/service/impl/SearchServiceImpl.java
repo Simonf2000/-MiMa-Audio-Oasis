@@ -9,6 +9,8 @@ import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
+import co.elastic.clients.elasticsearch.core.search.Hit;
+import co.elastic.clients.elasticsearch.core.search.HitsMetadata;
 import com.atguigu.tingshu.album.AlbumFeignClient;
 import com.atguigu.tingshu.model.album.AlbumAttributeValue;
 import com.atguigu.tingshu.model.album.AlbumInfo;
@@ -19,6 +21,7 @@ import com.atguigu.tingshu.query.search.AlbumIndexQuery;
 import com.atguigu.tingshu.search.AlbumInfoIndexRepository;
 import com.atguigu.tingshu.search.service.SearchService;
 import com.atguigu.tingshu.user.client.UserFeignClient;
+import com.atguigu.tingshu.vo.search.AlbumInfoIndexVo;
 import com.atguigu.tingshu.vo.search.AlbumSearchResponseVo;
 import com.atguigu.tingshu.vo.user.UserInfoVo;
 import lombok.extern.slf4j.Slf4j;
@@ -26,9 +29,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
@@ -146,7 +149,7 @@ public class SearchServiceImpl implements SearchService {
             System.out.println("本次检索DSL:");
             System.out.println(searchRequest);
             SearchResponse<AlbumInfoIndex> searchResponse = elasticsearchClient.search(searchRequest, AlbumInfoIndex.class);
-            return this.parseResult(searchResponse);
+            return this.parseResult(searchResponse, albumIndexQuery);
         } catch (Exception e) {
             log.error("[搜索服务]站内搜索异常", e);
             throw new RuntimeException(e);
@@ -174,17 +177,17 @@ public class SearchServiceImpl implements SearchService {
 
         Long category1Id = albumIndexQuery.getCategory1Id();
         if (category1Id != null) {
-            allBoolQueryBuilder.filter(f -> f.term(t->t.field("category1Id").value(category1Id)));
+            allBoolQueryBuilder.filter(f -> f.term(t -> t.field("category1Id").value(category1Id)));
         }
 
         Long category2Id = albumIndexQuery.getCategory2Id();
         if (category2Id != null) {
-            allBoolQueryBuilder.filter(f -> f.term(t->t.field("category2Id").value(category2Id)));
+            allBoolQueryBuilder.filter(f -> f.term(t -> t.field("category2Id").value(category2Id)));
         }
 
         Long category3Id = albumIndexQuery.getCategory3Id();
         if (category3Id != null) {
-            allBoolQueryBuilder.filter(f -> f.term(t->t.field("category3Id").value(category3Id)));
+            allBoolQueryBuilder.filter(f -> f.term(t -> t.field("category3Id").value(category3Id)));
         }
 
         List<String> attributeList = albumIndexQuery.getAttributeList();
@@ -193,7 +196,7 @@ public class SearchServiceImpl implements SearchService {
             for (String s : attributeList) {
                 //每循环一次，封装标签Nested查询
                 String[] split = s.split(":");
-                if (split != null && split.length==2) {
+                if (split != null && split.length == 2) {
 
                     allBoolQueryBuilder.filter(f -> f.nested(n ->
                             n.path("attributeValueIndexList")
@@ -246,8 +249,33 @@ public class SearchServiceImpl implements SearchService {
     }
 
     @Override
-    public AlbumSearchResponseVo parseResult(SearchResponse<AlbumInfoIndex> searchResponse) {
-        return null;
+    public AlbumSearchResponseVo parseResult(SearchResponse<AlbumInfoIndex> searchResponse, AlbumIndexQuery albumIndexQuery) {
+        AlbumSearchResponseVo vo = new AlbumSearchResponseVo();
+        HitsMetadata<AlbumInfoIndex> hits = searchResponse.hits();
+        long total = hits.total().value();
+        Integer pageSize = albumIndexQuery.getPageSize();
+        long totalPages = total % pageSize == 0 ? total / pageSize : total / pageSize + 1;
+
+        vo.setTotal(total);
+        vo.setTotalPages(totalPages);
+        vo.setPageNo(albumIndexQuery.getPageNo());
+        vo.setPageSize(pageSize);
+
+        List<Hit<AlbumInfoIndex>> hitList = hits.hits();
+        if (CollectionUtil.isNotEmpty(hitList)) {
+            List<AlbumInfoIndexVo> list = hitList.stream()
+                    .map(hit -> {
+                        AlbumInfoIndexVo albumInfoIndexVo = BeanUtil.copyProperties(hit.source(), AlbumInfoIndexVo.class);
+                        Map<String, List<String>> highlight = hit.highlight();
+                        if (CollectionUtil.isNotEmpty(highlight)) {
+                            String albumTitleHighlight = highlight.get("albumTitle").get(0);
+                            albumInfoIndexVo.setAlbumTitle(albumTitleHighlight);
+                        }
+                        return albumInfoIndexVo;
+                    }).collect(Collectors.toList());
+            vo.setList(list);
+        }
+        return vo;
     }
 }
 

@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.atguigu.tingshu.album.service.BaseCategoryService;
 import com.atguigu.tingshu.common.result.Result;
 import com.atguigu.tingshu.model.album.BaseAttribute;
+import com.atguigu.tingshu.model.album.BaseCategory3;
 import com.atguigu.tingshu.model.album.BaseCategoryView;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -49,6 +50,13 @@ public class BaseCategoryApiController {
 	public Result<BaseCategoryView> getCategoryView(@PathVariable Long category3Id){
 		BaseCategoryView baseCategoryView = baseCategoryService.getCategoryView(category3Id);
 		return Result.ok(baseCategoryView);
+	}
+
+	@Operation(summary = "根据1级分类ID查询该分类下前7个置顶3级分类列表")
+	@GetMapping("/category/findTopBaseCategory3/{category1Id}")
+	public Result<List<BaseCategory3>> getTopBaseCategory3(@PathVariable Long category1Id){
+		List<BaseCategory3> list = baseCategoryService.getTop7Category3(category1Id);
+		return Result.ok(list);
 	}
 
 }

@@ -1,11 +1,11 @@
 package com.atguigu.tingshu.album.service.impl;
 
+import cn.hutool.core.collection.CollectionUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.atguigu.tingshu.album.mapper.*;
 import com.atguigu.tingshu.album.service.BaseCategoryService;
-import com.atguigu.tingshu.model.album.BaseAttribute;
-import com.atguigu.tingshu.model.album.BaseCategory1;
-import com.atguigu.tingshu.model.album.BaseCategoryView;
+import com.atguigu.tingshu.model.album.*;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -37,6 +37,7 @@ public class BaseCategoryServiceImpl extends ServiceImpl<BaseCategory1Mapper, Ba
     /**
      * 查询所有分类（1、2、3级分类）
      * TODO :每次查询都需要查询DB，将来将读多写少数据放入缓存Redis中
+     *
      * @return
      */
     @Override
@@ -114,5 +115,30 @@ public class BaseCategoryServiceImpl extends ServiceImpl<BaseCategory1Mapper, Ba
     @Override
     public BaseCategoryView getCategoryView(Long category3Id) {
         return baseCategoryViewMapper.selectById(category3Id);
+    }
+
+    @Override
+    public List<BaseCategory3> getTop7Category3(Long category1Id) {
+        //1.根据1级分类ID查询二级分类列表 得到二级分类ID集合
+        LambdaQueryWrapper<BaseCategory2> baseCategory2LambdaQueryWrapper = new LambdaQueryWrapper<>();
+        baseCategory2LambdaQueryWrapper.eq(BaseCategory2::getCategory1Id, category1Id);
+        //索引覆盖，减少回表
+        baseCategory2LambdaQueryWrapper.select(BaseCategory2::getId);
+        List<BaseCategory2> baseCategory2List = baseCategory2Mapper.selectList(baseCategory2LambdaQueryWrapper);
+        if (CollectionUtil.isNotEmpty(baseCategory2List)) {
+            List<Long> category2IdList = baseCategory2List
+                    .stream()
+                    .map(BaseCategory2::getId)
+                    .collect(Collectors.toList());
+            //2.根据二级分类ID集合查询三级分类表，得到置顶三级分类
+            LambdaQueryWrapper<BaseCategory3> baseCategory3LambdaQueryWrapper = new LambdaQueryWrapper<>();
+            baseCategory3LambdaQueryWrapper.in(BaseCategory3::getCategory2Id, category2IdList);
+            baseCategory3LambdaQueryWrapper.select(BaseCategory3::getId, BaseCategory3::getName);
+            baseCategory3LambdaQueryWrapper.eq(BaseCategory3::getIsTop, 1);
+            baseCategory3LambdaQueryWrapper.orderByAsc(BaseCategory3::getOrderNum);
+            baseCategory3LambdaQueryWrapper.last("limit 7");
+            return baseCategory3Mapper.selectList(baseCategory3LambdaQueryWrapper);
+        }
+        return null;
     }
 }

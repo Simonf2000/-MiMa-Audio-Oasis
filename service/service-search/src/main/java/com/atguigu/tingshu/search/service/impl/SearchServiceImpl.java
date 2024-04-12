@@ -6,6 +6,7 @@ import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.RandomUtil;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.SortOrder;
+import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import com.atguigu.tingshu.album.AlbumFeignClient;
@@ -156,6 +157,20 @@ public class SearchServiceImpl implements SearchService {
     public SearchRequest buildDSL(AlbumIndexQuery albumIndexQuery) {
         SearchRequest.Builder builder = new SearchRequest.Builder();
         builder.index(INDEX_NAME);
+        //2.设置查询条件对应请求体参数中"query" 封装关键字、分类过滤、标签过滤
+        String keyword = albumIndexQuery.getKeyword();
+        //2.1 创建最外层组合多条件查询对象-封装所有查询条件
+        BoolQuery.Builder allBoolQueryBuilder = new BoolQuery.Builder();
+        //2.2 处理关键字检索 关键字全文检索专辑标题，简介。等值精确查询作者名称
+        if (StringUtils.isNotBlank(keyword)) {
+            allBoolQueryBuilder.must(
+                    m -> m.bool(
+                            b -> b.should(s -> s.match(ma -> ma.field("albumTitle").query(keyword)))
+                                    .should(s -> s.match(ma -> ma.field("albumIntro").query(keyword)))
+                                    .should(s -> s.term(t -> t.field("announcerName").value(keyword)))
+                    )
+            );
+        }
 //        builder.query();
         Integer pageNo = albumIndexQuery.getPageNo();
         Integer pageSize = albumIndexQuery.getPageSize();

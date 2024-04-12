@@ -25,4 +25,6 @@ public interface AlbumInfoService extends IService<AlbumInfo> {
     void updateAlbumInfo(AlbumInfo albumInfo);
 
     List<AlbumInfo> getUserAllAlbumList(Long userId);
+
+    void publishAlbum(Long id);
 }

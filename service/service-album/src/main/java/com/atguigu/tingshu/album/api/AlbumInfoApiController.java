@@ -9,6 +9,7 @@ import com.atguigu.tingshu.query.album.AlbumInfoQuery;
 import com.atguigu.tingshu.vo.album.AlbumInfoVo;
 import com.atguigu.tingshu.vo.album.AlbumListVo;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,14 @@ public class AlbumInfoApiController {
     public Result saveAlbumInfo(@RequestBody AlbumInfoVo albumInfoVo) {
         Long userId = AuthContextHolder.getUserId();
         albumInfoService.saveAlbumInfo(userId, albumInfoVo);
+        return Result.ok();
+    }
+
+    @GuiGuLogin
+    @Operation(summary = "发布专辑")
+    @PostMapping("/albumInfo/publish/{id}")
+    public Result publishAlbum(@PathVariable Long id) {
+        albumInfoService.publishAlbum(id);
         return Result.ok();
     }
 
@@ -69,6 +78,7 @@ public class AlbumInfoApiController {
         return Result.ok();
     }
 
+    @GuiGuLogin
     @Operation(summary = "查询当前用户发布所有专辑列表")
     @GetMapping("/albumInfo/findUserAllAlbumList")
     public Result<List<AlbumInfo>> getUserAllAlbumList() {

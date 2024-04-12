@@ -71,6 +71,10 @@ public class TrackInfo extends BaseEntity {
 	@TableField("status")
 	private String status;
 
+	@Schema(description = "腾讯点播审核任务ID")
+	@TableField("review_task_id")
+	private String reviewTaskId;
+
 	@Schema(description = "是否公开：0-否 1-是")
 	@TableField("is_open")
 	private String isOpen;

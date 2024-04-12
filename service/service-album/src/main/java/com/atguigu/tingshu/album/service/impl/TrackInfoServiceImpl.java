@@ -112,6 +112,11 @@ public class TrackInfoServiceImpl extends ServiceImpl<TrackInfoMapper, TrackInfo
 
         albumInfo.setIncludeTrackCount(albumInfo.getIncludeTrackCount() + 1);
         albumInfoMapper.updateById(albumInfo);
+
+        String reviewMediaTaskId = vodService.startReviewMediaTask(trackInfo.getMediaFileId());
+        trackInfo.setReviewTaskId(reviewMediaTaskId);
+        trackInfo.setStatus(SystemConstant.TRACK_STATUS_REVIEWING);
+        trackInfoMapper.updateById(trackInfo);
     }
 
     @Override

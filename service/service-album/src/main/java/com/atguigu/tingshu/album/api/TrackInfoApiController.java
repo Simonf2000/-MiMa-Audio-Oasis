@@ -26,7 +26,7 @@ public class TrackInfoApiController {
     @Autowired
     private TrackInfoService trackInfoService;
 
-    @GuiGuLogin
+    //@GuiGuLogin
     @Operation(summary = "将音频文件上传到腾讯云点播平台")
     @PostMapping("/trackInfo/uploadTrack")
     public Result<Map<String, String>> uploadTrack(@RequestParam("file") MultipartFile trackFile) {

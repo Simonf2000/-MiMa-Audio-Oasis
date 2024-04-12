@@ -175,4 +175,20 @@ public class AlbumInfoServiceImpl extends ServiceImpl<AlbumInfoMapper, AlbumInfo
         queryWrapper.last("limit 100");
         return albumInfoMapper.selectList(queryWrapper);
     }
+
+    @Override
+    public void publishAlbum(Long id) {
+        //1.查询专辑下所有声音是否都经过审核
+        LambdaQueryWrapper<TrackInfo> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(TrackInfo::getStatus, SystemConstant.TRACK_STATUS_REVIEWING).or().eq(TrackInfo::getStatus, SystemConstant.TRACK_STATUS_NO_PASS);
+        queryWrapper.eq(TrackInfo::getAlbumId, id);
+        queryWrapper.last("limit 1");
+        queryWrapper.select(TrackInfo::getId);
+        Long count = trackInfoMapper.selectCount(queryWrapper);
+        if (count > 0) {
+            throw new GuiguException(500, "该专辑下存在未审核通过声音");
+        }
+        //2.发送MQ消息到Kafka 异步 上架专辑
+        kafkaService.sendKafkaMessage(KafkaConstant.QUEUE_ALBUM_UPPER, id.toString());
+    }
 }

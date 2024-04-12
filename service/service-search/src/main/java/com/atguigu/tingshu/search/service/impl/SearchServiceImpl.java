@@ -171,6 +171,24 @@ public class SearchServiceImpl implements SearchService {
                     )
             );
         }
+
+        Long category1Id = albumIndexQuery.getCategory1Id();
+        if (category1Id != null) {
+            allBoolQueryBuilder.filter(f -> f.term(t->t.field("category1Id").value(category1Id)));
+        }
+
+        Long category2Id = albumIndexQuery.getCategory2Id();
+        if (category2Id != null) {
+            allBoolQueryBuilder.filter(f -> f.term(t->t.field("category2Id").value(category2Id)));
+        }
+
+        Long category3Id = albumIndexQuery.getCategory3Id();
+        if (category3Id != null) {
+            allBoolQueryBuilder.filter(f -> f.term(t->t.field("category3Id").value(category3Id)));
+        }
+
+        builder.query(allBoolQueryBuilder.build()._toQuery());
+
 //        builder.query();
         Integer pageNo = albumIndexQuery.getPageNo();
         Integer pageSize = albumIndexQuery.getPageSize();
@@ -201,12 +219,12 @@ public class SearchServiceImpl implements SearchService {
                 builder.sort(s -> s.field(f -> f.field(finalOrderFiled).order(sortOrder)));
             }
         }
-            if (StringUtils.isNotBlank(albumIndexQuery.getKeyword())) {
-                builder.highlight(h -> h.fields("albumTitle", f -> f.preTags("<font style='color:red'>").postTags("</font>")));
-            }
-            builder.source(s -> s.filter(f -> f.excludes("isFinished", "category1Id", "category2Id", "category3Id", "hotScore", "attributeValueIndexList.attributeId", "attributeValueIndexList.valueId")));
-            return builder.build();
+        if (StringUtils.isNotBlank(albumIndexQuery.getKeyword())) {
+            builder.highlight(h -> h.fields("albumTitle", f -> f.preTags("<font style='color:red'>").postTags("</font>")));
         }
+        builder.source(s -> s.filter(f -> f.excludes("isFinished", "category1Id", "category2Id", "category3Id", "hotScore", "attributeValueIndexList.attributeId", "attributeValueIndexList.valueId")));
+        return builder.build();
+    }
 
     @Override
     public AlbumSearchResponseVo parseResult(SearchResponse<AlbumInfoIndex> searchResponse) {

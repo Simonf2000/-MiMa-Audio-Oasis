@@ -4,20 +4,26 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.RandomUtil;
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch.core.SearchRequest;
+import co.elastic.clients.elasticsearch.core.SearchResponse;
 import com.atguigu.tingshu.album.AlbumFeignClient;
 import com.atguigu.tingshu.model.album.AlbumAttributeValue;
 import com.atguigu.tingshu.model.album.AlbumInfo;
 import com.atguigu.tingshu.model.album.BaseCategoryView;
 import com.atguigu.tingshu.model.search.AlbumInfoIndex;
 import com.atguigu.tingshu.model.search.AttributeValueIndex;
+import com.atguigu.tingshu.query.search.AlbumIndexQuery;
 import com.atguigu.tingshu.search.AlbumInfoIndexRepository;
 import com.atguigu.tingshu.search.service.SearchService;
 import com.atguigu.tingshu.user.client.UserFeignClient;
+import com.atguigu.tingshu.vo.search.AlbumSearchResponseVo;
 import com.atguigu.tingshu.vo.user.UserInfoVo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -42,6 +48,11 @@ public class SearchServiceImpl implements SearchService {
     @Autowired
     private ThreadPoolExecutor threadPoolExecutor;
 
+    @Autowired
+    private ElasticsearchClient elasticsearchClient;
+
+    @Autowired
+    private static final String INDEX_NAME = "albuminfo";
 
     /**
      * 将指定专辑封装专辑索引库文档对象，完成文档信息
@@ -123,5 +134,32 @@ public class SearchServiceImpl implements SearchService {
     @Override
     public void lowerAlbum(Long albumId) {
         albumInfoIndexRepository.deleteById(albumId);
+    }
+
+    @Override
+    public AlbumSearchResponseVo search(AlbumIndexQuery albumIndexQuery) {
+        try {
+            SearchRequest searchRequest = this.buildDSL(albumIndexQuery);
+            System.out.println("本次检索DSL:");
+            System.out.println(searchRequest);
+            SearchResponse<AlbumInfoIndex> searchResponse = elasticsearchClient.search(searchRequest, AlbumInfoIndex.class);
+            return this.parseResult(searchResponse);
+        } catch (Exception e) {
+            log.error("[搜索服务]站内搜索异常", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public SearchRequest buildDSL(AlbumIndexQuery albumIndexQuery) {
+        SearchRequest.Builder builder = new SearchRequest.Builder();
+        builder.index(INDEX_NAME);
+
+        return builder.build();
+    }
+
+    @Override
+    public AlbumSearchResponseVo parseResult(SearchResponse<AlbumInfoIndex> searchResponse) {
+        return null;
     }
 }

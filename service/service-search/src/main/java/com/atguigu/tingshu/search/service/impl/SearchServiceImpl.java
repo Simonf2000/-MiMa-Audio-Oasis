@@ -20,6 +20,7 @@ import com.atguigu.tingshu.user.client.UserFeignClient;
 import com.atguigu.tingshu.vo.search.AlbumSearchResponseVo;
 import com.atguigu.tingshu.vo.user.UserInfoVo;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -154,8 +155,19 @@ public class SearchServiceImpl implements SearchService {
     public SearchRequest buildDSL(AlbumIndexQuery albumIndexQuery) {
         SearchRequest.Builder builder = new SearchRequest.Builder();
         builder.index(INDEX_NAME);
-
+//        builder.query();
+        Integer pageNo = albumIndexQuery.getPageNo();
+        Integer pageSize = albumIndexQuery.getPageSize();
+        int from = (pageNo - 1) * pageSize;
+        builder.from(from).size(pageSize);
+        //builder.sort();
+        if (StringUtils.isNotBlank(albumIndexQuery.getKeyword())) {
+            builder.highlight(h -> h.fields("albumTitle", f -> f.preTags("<font style='color:red'>").postTags("</font>")));
+        }
+        builder.source(s -> s.filter(f -> f.excludes("isFinished", "category1Id", "category2Id", "category3Id", "hotScore", "attributeValueIndexList.attributeId", "attributeValueIndexList.valueId")));
         return builder.build();
+
+
     }
 
     @Override

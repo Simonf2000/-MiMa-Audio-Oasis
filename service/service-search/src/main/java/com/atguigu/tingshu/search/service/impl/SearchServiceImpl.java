@@ -5,6 +5,7 @@ import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.RandomUtil;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import com.atguigu.tingshu.album.AlbumFeignClient;
@@ -160,18 +161,41 @@ public class SearchServiceImpl implements SearchService {
         Integer pageSize = albumIndexQuery.getPageSize();
         int from = (pageNo - 1) * pageSize;
         builder.from(from).size(pageSize);
-        //builder.sort();
-        if (StringUtils.isNotBlank(albumIndexQuery.getKeyword())) {
-            builder.highlight(h -> h.fields("albumTitle", f -> f.preTags("<font style='color:red'>").postTags("</font>")));
+
+        String order = albumIndexQuery.getOrder();
+        if (StringUtils.isNotBlank(order)) {
+            // 对排序字符按照:进行切割
+            String[] split = order.split(":");
+            if (split != null && split.length == 2) {
+                // 得到排序字段及排序方式 综合排序[1:desc] 播放量[2:desc] 发布时间[3:desc]
+                String orderFiled = "";
+                switch (split[0]) {
+                    case "1":
+                        orderFiled = "hotScore";
+                        break;
+                    case "2":
+                        orderFiled = "playStatNum";
+                        break;
+                    case "3":
+                        orderFiled = "createTime";
+                        break;
+                }
+
+                SortOrder sortOrder = "asc".equals(split[1]) ? SortOrder.Asc : SortOrder.Desc;
+                String finalOrderFiled = orderFiled;
+                builder.sort(s -> s.field(f -> f.field(finalOrderFiled).order(sortOrder)));
+            }
         }
-        builder.source(s -> s.filter(f -> f.excludes("isFinished", "category1Id", "category2Id", "category3Id", "hotScore", "attributeValueIndexList.attributeId", "attributeValueIndexList.valueId")));
-        return builder.build();
-
-
-    }
+            if (StringUtils.isNotBlank(albumIndexQuery.getKeyword())) {
+                builder.highlight(h -> h.fields("albumTitle", f -> f.preTags("<font style='color:red'>").postTags("</font>")));
+            }
+            builder.source(s -> s.filter(f -> f.excludes("isFinished", "category1Id", "category2Id", "category3Id", "hotScore", "attributeValueIndexList.attributeId", "attributeValueIndexList.valueId")));
+            return builder.build();
+        }
 
     @Override
     public AlbumSearchResponseVo parseResult(SearchResponse<AlbumInfoIndex> searchResponse) {
         return null;
     }
 }
+

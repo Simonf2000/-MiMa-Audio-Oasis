@@ -187,6 +187,25 @@ public class SearchServiceImpl implements SearchService {
             allBoolQueryBuilder.filter(f -> f.term(t->t.field("category3Id").value(category3Id)));
         }
 
+        List<String> attributeList = albumIndexQuery.getAttributeList();
+        if (CollectionUtil.isNotEmpty(attributeList)) {
+            //2.4.1 前端可能提交多个标签过滤条件 提交标签形式  标签id：标签值Id
+            for (String s : attributeList) {
+                //每循环一次，封装标签Nested查询
+                String[] split = s.split(":");
+                if (split != null && split.length==2) {
+
+                    allBoolQueryBuilder.filter(f -> f.nested(n ->
+                            n.path("attributeValueIndexList")
+                                    .query(q -> q.bool(
+                                            b -> b.must(m -> m.term(t -> t.field("attributeValueIndexList.attributeId").value(split[0])))
+                                                    .must(m -> m.term(t -> t.field("attributeValueIndexList.valueId").value(split[1])))
+                                    ))
+                    ));
+                }
+            }
+        }
+
         builder.query(allBoolQueryBuilder.build()._toQuery());
 
 //        builder.query();

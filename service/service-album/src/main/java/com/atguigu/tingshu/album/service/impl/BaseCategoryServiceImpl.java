@@ -1,6 +1,7 @@
 package com.atguigu.tingshu.album.service.impl;
 
 import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.core.lang.Assert;
 import com.alibaba.fastjson.JSONObject;
 import com.atguigu.tingshu.album.mapper.*;
 import com.atguigu.tingshu.album.service.BaseCategoryService;
@@ -140,5 +141,55 @@ public class BaseCategoryServiceImpl extends ServiceImpl<BaseCategory1Mapper, Ba
             return baseCategory3Mapper.selectList(baseCategory3LambdaQueryWrapper);
         }
         return null;
+    }
+
+    @Override
+    public JSONObject getBaseCategoryListByCategory1Id(Long category1Id) {
+        //1.处理一级分类
+        //1.1 根据1级分类ID查询“一级”分类列表
+        LambdaQueryWrapper<BaseCategoryView> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(BaseCategoryView::getCategory1Id, category1Id);
+        List<BaseCategoryView> baseCategory1List = baseCategoryViewMapper.selectList(queryWrapper);
+        Assert.notNull(baseCategory1List, "分类下为空");
+        //1.2 构建一级分类JSON对象 封装1级分类信息
+        Long category1Id1 = baseCategory1List.get(0).getCategory1Id();
+        String category1Name = baseCategory1List.get(0).getCategory1Name();
+
+        JSONObject jsonObject1 = new JSONObject();
+        jsonObject1.put("categoryId", category1Id1);
+        jsonObject1.put("categoryName", category1Name);
+
+        //2.处理二级分类
+        //2.1 对列表按照2级分类ID进行分组 得到 “二级”分类Map
+        Map<Long, List<BaseCategoryView>> map2 = baseCategory1List.stream().collect(Collectors.groupingBy(BaseCategoryView::getCategory2Id));
+        //2.2 遍历Map 封装二级分类JSON对象
+        List<JSONObject> jsonObject2List = new ArrayList<>();
+        for (Map.Entry<Long, List<BaseCategoryView>> entry2 : map2.entrySet()) {
+            Long category2Id = entry2.getKey();
+            String category2Name = entry2.getValue().get(0).getCategory2Name();
+            //2.2.1 创建二级分类JSON对象
+            JSONObject jsonObject2 = new JSONObject();
+            //2.2.2 封装2级分类ID，名称
+            jsonObject2.put("categoryId", category2Id);
+            jsonObject2.put("categoryName", category2Name);
+            jsonObject2List.add(jsonObject2);
+            //3.处理三级分类
+            //3.1 遍历"二级分类"列表得到三级分类信息
+            List<JSONObject> jsonObject3List = new ArrayList<>();
+            for (BaseCategoryView baseCategoryView : entry2.getValue()) {
+                //3.1.1创建3级分类JSON对象
+                JSONObject jsonObject3 = new JSONObject();
+                //3.1.2封装3级分类ID，名称
+                jsonObject3.put("categoryId", baseCategoryView.getCategory3Id());
+                jsonObject3.put("categoryName", baseCategoryView.getCategory3Name());
+                jsonObject3List.add(jsonObject3);
+            }
+            //3.2 将3级分类JSON对象集合存入2级分类对象"categoryChild"中
+            jsonObject2.put("categoryChild", jsonObject3List);
+
+        }
+        //2.3 将二级分类JSON对象集合存入1级分类对象"categoryChild"中
+        jsonObject1.put("categoryChild", jsonObject2List);
+        return jsonObject1;
     }
 }

@@ -59,5 +59,18 @@ public class BaseCategoryApiController {
 		return Result.ok(list);
 	}
 
+
+	/**
+	 * 查询1级分类下所有二级级三级分类
+	 * @param category1Id 1级分类ID
+	 * @return {categoryId:1,categoryName:"音乐",categoryChild:[{},{}]}
+	 */
+	@Operation(summary = "查询1级分类下所有二级级三级分类")
+	@GetMapping("/category/getBaseCategoryList/{category1Id}")
+	public Result<JSONObject> getBaseCategoryList(@PathVariable Long category1Id){
+		JSONObject jsonObject = baseCategoryService.getBaseCategoryListByCategory1Id(category1Id);
+		return Result.ok(jsonObject);
+	}
+
 }
 

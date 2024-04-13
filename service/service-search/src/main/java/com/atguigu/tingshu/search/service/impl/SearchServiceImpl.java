@@ -5,15 +5,21 @@ import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.RandomUtil;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.SortOrder;
+import co.elastic.clients.elasticsearch._types.aggregations.Aggregate;
+import co.elastic.clients.elasticsearch._types.aggregations.LongTermsAggregate;
+import co.elastic.clients.elasticsearch._types.aggregations.LongTermsBucket;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.elasticsearch.core.search.HitsMetadata;
+import com.alibaba.fastjson.JSON;
 import com.atguigu.tingshu.album.AlbumFeignClient;
 import com.atguigu.tingshu.model.album.AlbumAttributeValue;
 import com.atguigu.tingshu.model.album.AlbumInfo;
+import com.atguigu.tingshu.model.album.BaseCategory3;
 import com.atguigu.tingshu.model.album.BaseCategoryView;
 import com.atguigu.tingshu.model.search.AlbumInfoIndex;
 import com.atguigu.tingshu.model.search.AttributeValueIndex;
@@ -29,7 +35,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -276,6 +284,66 @@ public class SearchServiceImpl implements SearchService {
             vo.setList(list);
         }
         return vo;
+    }
+
+    @Override
+    public List<Map<String, Object>> getTop6AlbumByCategory1(Long category1Id) {
+        try {
+            //1.远程调用"专辑服务"获取1级分类下置顶7个三级分类列表
+            List<BaseCategory3> baseCategory3List = albumFeignClient.getTopBaseCategory3(category1Id).getData();
+            Assert.notNull(baseCategory3List, "该分类{}下无三级分类", category1Id);
+            //1.1 遍历得到所有三级分类ID集合
+            List<Long> baseCategory3IdList = baseCategory3List.stream().map(BaseCategory3::getId).collect(Collectors.toList());
+            //1.2 执行多关键字检索需要List<FieldValue> 故 转换类型
+            List<FieldValue> fieldValueList = baseCategory3IdList.stream()
+                    .map(category3Id -> FieldValue.of(category3Id)).collect(Collectors.toList());
+
+            //1.3 后续解析结果方便获取三级分类对象 将三级集合转为Map Key:三级分类ID Value：三级分类对象
+            Map<Long, BaseCategory3> baseCategory3Map = baseCategory3List
+                    .stream()
+                    .collect(Collectors.toMap(BaseCategory3::getId, baseCategory3-> baseCategory3));
+
+            //2.执行ES检索
+            SearchResponse<AlbumInfoIndex> searchResponse =
+                    elasticsearchClient.search(
+                            s -> s.index(INDEX_NAME)
+                                    .query(q -> q.terms(t -> t.field("category3Id").terms(t1 -> t1.value(fieldValueList))))
+                                    .size(0)
+                                    .aggregations(
+                                            "category3_agg", a -> a.terms(t -> t.field("category3Id").size(20))
+                                                    .aggregations("top6", a1 -> a1.topHits(t -> t.size(6).sort(sort -> sort.field(f -> f.field("hotScore").order(SortOrder.Desc)))))
+                                    ),
+                            AlbumInfoIndex.class
+                    );
+            //3.解析ES响应结果，封装自定义结果List<Map<String, Object>>代表所有置顶三级分类热门专辑列表
+            //3.1 获取ES响应中聚合结果对象，根据请求体参数聚合名称，获取三级分类聚合对象
+            Aggregate category3_agg = searchResponse.aggregations().get("category3_agg");
+            LongTermsAggregate category3Lterms = category3_agg.lterms();
+            //3.2 获取三级分类聚合结果Buckets桶数组 遍历Bucket数组 每遍历一个Bucket处理一个置顶三级分类 Map
+            List<LongTermsBucket> category3Buckets = category3Lterms.buckets().array();
+            List<Map<String, Object>> list = category3Buckets.stream().map(category3Bucket -> {
+                //3.3 获取三级分类ID
+                long topCategory3Id = category3Bucket.key();
+                //3.4 遍历当前三级分类聚合中子聚合得到热门专辑前6个列表
+                Aggregate top6 = category3Bucket.aggregations().get("top6");
+                List<AlbumInfoIndex> hotAlbumIndexList = top6.topHits().hits().hits()
+                        .stream()
+                        .map(hit -> {
+                            String albumIndexStr = hit.source().toJson().toString();
+                            AlbumInfoIndex hotAlbumInfoIndex = JSON.parseObject(albumIndexStr, AlbumInfoIndex.class);
+                            return hotAlbumInfoIndex;
+                        }).collect(Collectors.toList());
+                //3.5 构建当前置顶三级分类热门专辑Map对象
+                Map<String, Object> map = new HashMap<>();
+                map.put("baseCategory3", baseCategory3Map.get(topCategory3Id));
+                map.put("list", hotAlbumIndexList);
+                return map;
+            }).collect(Collectors.toList());
+            return list;
+        } catch (IOException e) {
+            log.error("[搜索服务]置顶分类热门专辑异常：", e);
+            throw new RuntimeException(e);
+        }
     }
 }
 

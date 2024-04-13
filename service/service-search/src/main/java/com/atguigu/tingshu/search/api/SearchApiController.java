@@ -9,6 +9,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.Map;
+
 
 @Tag(name = "搜索专辑管理")
 @RestController
@@ -52,5 +55,19 @@ public class SearchApiController {
         return Result.ok(vo);
     }
 
+    /**
+     * 查询1级下置顶三级分类热门前6专辑
+     *
+     * @param category1Id
+     * @return
+     */
+    @Operation(summary = "查询1级下置顶三级分类热门前6专辑")
+    @GetMapping("/albumInfo/channel/{category1Id}")
+    public Result<List<Map<String, Object>>> getTop6AlbumByCategory1(@PathVariable Long category1Id) {
+        List<Map<String, Object>> list = searchService.getTop6AlbumByCategory1(category1Id);
+        return Result.ok(list);
+    }
 }
+
+
 

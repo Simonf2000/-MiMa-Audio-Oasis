@@ -19,6 +19,7 @@ import com.atguigu.tingshu.query.album.AlbumInfoQuery;
 import com.atguigu.tingshu.vo.album.AlbumAttributeValueVo;
 import com.atguigu.tingshu.vo.album.AlbumInfoVo;
 import com.atguigu.tingshu.vo.album.AlbumListVo;
+import com.atguigu.tingshu.vo.album.AlbumStatVo;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -190,5 +191,10 @@ public class AlbumInfoServiceImpl extends ServiceImpl<AlbumInfoMapper, AlbumInfo
         }
         //2.发送MQ消息到Kafka 异步 上架专辑
         kafkaService.sendKafkaMessage(KafkaConstant.QUEUE_ALBUM_UPPER, id.toString());
+    }
+
+    @Override
+    public AlbumStatVo getAlbumStatVo(Long albumId) {
+        return albumInfoMapper.getAlbumStatVo(albumId);
     }
 }

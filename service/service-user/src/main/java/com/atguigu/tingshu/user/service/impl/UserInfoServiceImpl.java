@@ -3,13 +3,18 @@ package com.atguigu.tingshu.user.service.impl;
 import cn.binarywang.wx.miniapp.api.WxMaService;
 import cn.binarywang.wx.miniapp.bean.WxMaJscode2SessionResult;
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.IdUtil;
 import com.atguigu.tingshu.common.constant.KafkaConstant;
 import com.atguigu.tingshu.common.constant.RedisConstant;
 import com.atguigu.tingshu.common.execption.GuiguException;
 import com.atguigu.tingshu.common.service.KafkaService;
 import com.atguigu.tingshu.model.user.UserInfo;
+import com.atguigu.tingshu.model.user.UserPaidAlbum;
+import com.atguigu.tingshu.model.user.UserPaidTrack;
 import com.atguigu.tingshu.user.mapper.UserInfoMapper;
+import com.atguigu.tingshu.user.mapper.UserPaidAlbumMapper;
+import com.atguigu.tingshu.user.mapper.UserPaidTrackMapper;
 import com.atguigu.tingshu.user.service.UserInfoService;
 import com.atguigu.tingshu.vo.user.UserInfoVo;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -21,8 +26,10 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -40,6 +47,12 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
 
     @Autowired
     private KafkaService kafkaService;
+
+    @Autowired
+    private UserPaidAlbumMapper userPaidAlbumMapper;
+
+    @Autowired
+    private UserPaidTrackMapper userPaidTrackMapper;
 
     @Override
     public Map<String, String> wxLogin(String code) {
@@ -106,6 +119,50 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         userInfo.setNickname(userInfoVo.getNickname());
         userInfo.setAvatarUrl(userInfoVo.getAvatarUrl());
         userInfoMapper.updateById(userInfo);
+    }
+
+    @Override
+    public Map<Long, Integer> getCheckBuyStausTrackIdList(Long userId, Long albumId, List<Long> needCheckBuyStausTrackIdList) {
+        Map<Long, Integer> map = new HashMap<>();
+        //1.判断用户是否已购买专辑
+        //1.1 根据用户ID+专辑ID查询专辑购买情况
+        LambdaQueryWrapper<UserPaidAlbum> userPaidAlbumLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        userPaidAlbumLambdaQueryWrapper.eq(UserPaidAlbum::getUserId, userId);
+        userPaidAlbumLambdaQueryWrapper.eq(UserPaidAlbum::getAlbumId, albumId);
+        userPaidAlbumLambdaQueryWrapper.last("limit 1");
+        Long count = userPaidAlbumMapper.selectCount(userPaidAlbumLambdaQueryWrapper);
+        //1.2 如果购买专辑，将提交所有声音购买情况设置为：1 返回
+        if (count > 0) {
+            for (Long trackId : needCheckBuyStausTrackIdList) {
+                map.put(trackId, 1);
+            }
+            return map;
+        }
+
+        //2.判断用户购买声音情况
+        //2.1 根据用户ID+专辑ID查询已购声音列表
+        LambdaQueryWrapper<UserPaidTrack> userPaidTrackLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        userPaidTrackLambdaQueryWrapper.eq(UserPaidTrack::getUserId, userId);
+        userPaidTrackLambdaQueryWrapper.eq(UserPaidTrack::getAlbumId, albumId);
+        userPaidTrackLambdaQueryWrapper.select(UserPaidTrack::getTrackId);
+        List<UserPaidTrack> userPaidTrackList = userPaidTrackMapper.selectList(userPaidTrackLambdaQueryWrapper);
+        //2.2 如果不存在已购声音，将提交所有声音购买情况设置为：0 返回
+        if (CollectionUtil.isEmpty(userPaidTrackList)) {
+            for (Long trackId : needCheckBuyStausTrackIdList) {
+                map.put(trackId, 0);
+            }
+            return map;
+        }
+        //2.3 如果存在已购声音，动态判断声音购买情况(遍历待检查声音购买情况ID列表，判断ID是否包含在已购声音ID列表中)
+        List<Long> userPaidTrackIdList = userPaidTrackList.stream().map(UserPaidTrack::getTrackId).collect(Collectors.toList());
+        for (Long trackId : needCheckBuyStausTrackIdList) {
+            if (userPaidTrackIdList.contains(trackId)) {
+                map.put(trackId, 1);
+            } else {
+                map.put(trackId, 0);
+            }
+        }
+        return map;
     }
 }
 

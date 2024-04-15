@@ -1,6 +1,7 @@
 package com.atguigu.tingshu.album.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.lang.Assert;
 import com.atguigu.tingshu.album.config.VodConstantProperties;
 import com.atguigu.tingshu.album.mapper.AlbumInfoMapper;
 import com.atguigu.tingshu.album.mapper.TrackInfoMapper;
@@ -14,10 +15,12 @@ import com.atguigu.tingshu.model.album.AlbumInfo;
 import com.atguigu.tingshu.model.album.TrackInfo;
 import com.atguigu.tingshu.model.album.TrackStat;
 import com.atguigu.tingshu.query.album.TrackInfoQuery;
+import com.atguigu.tingshu.user.client.UserFeignClient;
 import com.atguigu.tingshu.vo.album.AlbumTrackListVo;
 import com.atguigu.tingshu.vo.album.TrackInfoVo;
 import com.atguigu.tingshu.vo.album.TrackListVo;
 import com.atguigu.tingshu.vo.album.TrackMediaInfoVo;
+import com.atguigu.tingshu.vo.user.UserInfoVo;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -31,8 +34,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -56,6 +62,9 @@ public class TrackInfoServiceImpl extends ServiceImpl<TrackInfoMapper, TrackInfo
 
     @Autowired
     private TrackStatMapper trackStatMapper;
+
+    @Autowired
+    private UserFeignClient userFeignClient;
 
     @Override
     public Map<String, String> uploadTrack(MultipartFile trackFile) {
@@ -206,6 +215,52 @@ public class TrackInfoServiceImpl extends ServiceImpl<TrackInfoMapper, TrackInfo
                         .filter(albumTrackListVo -> albumTrackListVo.getOrderNum() > tracksForFreeCount) //去除免费试听声音
                         .forEach(albumTrackListVo -> {
                             albumTrackListVo.setIsShowPaidMark(true);
+                        });
+            }
+        } else {
+            //4. 处理用户已登录情况
+            //4.1 远程调用用户服务获取用户信息，得到用户身份
+            UserInfoVo userInfoVo = userFeignClient.getUserInfoVo(userId).getData();
+            Assert.notNull(userInfoVo, "用户：{}不存在", userId);
+            Boolean isVIP = false;
+            if (userInfoVo.getIsVip().intValue() == 1 && userInfoVo.getVipExpireTime().after(new Date())) {
+                isVIP = true;
+            }
+            //4.2 判断专辑付费类型-是否需要进一步判断用户购买情况
+            Boolean isNeedCheck = false;
+            //4.2.1 判断专辑付费类型是否为：VIP免费
+            if (SystemConstant.ALBUM_PAY_TYPE_VIPFREE.equals(payType)) {
+                if (!isVIP) {
+                    //当前用户为普通用户 专辑类型为VIP免费 需要进一步判断购买情况
+                    isNeedCheck = true;
+                }
+            }
+            //4.2.2 判断专辑付费类型是否为：付费-所有用户都需要进一步判断购买情况
+            if (SystemConstant.ALBUM_PAY_TYPE_REQUIRE.equals(payType)) {
+                isNeedCheck = true;
+            }
+
+            //4.3 需要进一步判断购买情况
+            if (isNeedCheck) {
+                //4.3.1 将免费试听声音排除掉得到需要判断购买情况声音ID集合
+                List<Long> needCheckBuyStausTrackIdList = pageInfo
+                        .getRecords()
+                        .stream()
+                        .filter(albumTrackListVo -> albumTrackListVo.getOrderNum() > tracksForFreeCount) //去除免费试听声音
+                        .map(AlbumTrackListVo::getTrackId) //映射获取声音ID
+                        .collect(Collectors.toList());    //收集得到需要判断购买情况声音ID集合
+                //4.3.2 远程调用用户服务判断本页中声音ID列表购买情况 {声音ID:1/0}
+                Map<Long, Integer> buyStatusMap = userFeignClient.userIsPaidTrack(userId, albumId, needCheckBuyStausTrackIdList).getData();
+                //4.3.3 根据返回购买情况Map，判断是否需要将标识改为true（未购买声音）
+                pageInfo
+                        .getRecords()
+                        .stream()
+                        .filter(albumTrackListVo -> albumTrackListVo.getOrderNum() > tracksForFreeCount)
+                        .forEach(albumTrackListVo -> {
+                            //找出本页中未购买声音ID，将付费标识设置：true
+                            if (buyStatusMap.get(albumTrackListVo.getTrackId()).intValue() == 0) {
+                                albumTrackListVo.setIsShowPaidMark(true);
+                            }
                         });
             }
         }

@@ -14,8 +14,10 @@ import co.elastic.clients.elasticsearch._types.aggregations.LongTermsBucket;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
 import co.elastic.clients.elasticsearch.core.SearchResponse;
+import co.elastic.clients.elasticsearch.core.search.CompletionSuggestOption;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.elasticsearch.core.search.HitsMetadata;
+import co.elastic.clients.elasticsearch.core.search.Suggestion;
 import com.alibaba.fastjson.JSON;
 import com.atguigu.tingshu.album.AlbumFeignClient;
 import com.atguigu.tingshu.model.album.AlbumAttributeValue;
@@ -41,9 +43,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
@@ -71,6 +71,10 @@ public class SearchServiceImpl implements SearchService {
 
     @Autowired
     private static final String INDEX_NAME = "albuminfo";
+
+    @Autowired
+    private static final String SUGGEST_INDEX_NAME = "suggestinfo";
+
 
     @Autowired
     private SuggestIndexRepository suggestIndexRepository;
@@ -370,6 +374,84 @@ public class SearchServiceImpl implements SearchService {
        String firstLetter = PinyinUtil.getFirstLetter(albumTitle,"");
        suggestIndex.setKeywordSequence(new Completion(new String[]{firstLetter}));
         suggestIndexRepository.save(suggestIndex);
+    }
+
+    @Override
+    public List<String> completeSuggest(String keyword) {
+        try {
+            //1.发起自动补全请求-设置建议请求参数
+            SearchResponse<SuggestIndex> searchResponse = elasticsearchClient
+                    .search(
+                            s -> s.index(SUGGEST_INDEX_NAME)
+                                    .suggest(
+                                            s1 -> s1.suggesters("letter-suggest", sf -> sf.prefix(keyword).completion(c -> c.field("keywordSequence").size(10).skipDuplicates(true)))
+                                                    .suggesters("pinyin-suggest", sf -> sf.prefix(keyword).completion(c -> c.field("keywordPinyin").size(10).skipDuplicates(true).fuzzy(f -> f.fuzziness("1"))))
+                                                    .suggesters("keyword-suggest", sf -> sf.prefix(keyword).completion(c -> c.field("keyword").size(10).skipDuplicates(true)))
+                                    ),
+                            SuggestIndex.class
+                    );
+            //2.解析ES响应建议词结果
+            Map<String, List<Suggestion<SuggestIndex>>> suggestMap = searchResponse.suggest();
+            //2.1 获取建议结果对象，分别从不同建议词结果中获取提示词列表
+            Set<String> suggestResultSet = new HashSet<>();
+            //2.2 将解析三个建议词结果提示词存入集合中（去重）
+            suggestResultSet.addAll(this.parseSuggestResult("letter-suggest", suggestMap));
+            suggestResultSet.addAll(this.parseSuggestResult("pinyin-suggest", suggestMap));
+            suggestResultSet.addAll(this.parseSuggestResult("keyword-suggest", suggestMap));
+            //2.3 如果得到建议词结果长度小于10采用全文检索补全
+            if (suggestResultSet.size() < 10) {
+                //2.3.1 全文检索专辑索引库
+                SearchResponse<AlbumInfoIndex> response = elasticsearchClient.search(
+                        s -> s.index(INDEX_NAME)
+                                .query(q -> q.match(m -> m.query(keyword).field("albumTitle")))
+                                .size(10),
+                        AlbumInfoIndex.class
+                );
+                //2.3.2 解析命中索引库中专辑标题
+                List<Hit<AlbumInfoIndex>> hits = response.hits().hits();
+                if (CollectionUtil.isNotEmpty(hits)) {
+                    for (Hit<AlbumInfoIndex> hit : hits) {
+                        AlbumInfoIndex albumInfoIndex = hit.source();
+                        String albumTitle = albumInfoIndex.getAlbumTitle();
+                        suggestResultSet.add(albumTitle);
+                        if (suggestResultSet.size() >= 10) {
+                            break;
+                        }
+                    }
+                }
+            }
+            //2.4 最终提示词列表最多是10个
+            List<String> list = new ArrayList<>(suggestResultSet);
+            if (list.size() < 10) {
+                return list;
+            } else {
+                return list.subList(0, 10);
+            }
+        } catch (IOException e) {
+            log.error("[搜索服务]，关键字自动补全异常：", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public Collection<String> parseSuggestResult(String suggestName, Map<String, List<Suggestion<SuggestIndex>>> suggestMap) {
+        List<String> list = new ArrayList<>();
+        List<Suggestion<SuggestIndex>> suggestionList = suggestMap.get(suggestName);
+        if (CollectionUtil.isNotEmpty(suggestionList)) {
+            for (Suggestion<SuggestIndex> suggestIndexSuggestion : suggestionList) {
+                //获取建议结果中options数组
+                List<CompletionSuggestOption<SuggestIndex>> options = suggestIndexSuggestion.completion().options();
+                if (CollectionUtil.isNotEmpty(options)) {
+                    for (CompletionSuggestOption<SuggestIndex> option : options) {
+                        SuggestIndex suggestIndex = option.source();
+                        //将提词文档中原始中文返回
+                        String title = suggestIndex.getTitle();
+                        list.add(title);
+                    }
+                }
+            }
+        }
+        return list;
     }
 }
 

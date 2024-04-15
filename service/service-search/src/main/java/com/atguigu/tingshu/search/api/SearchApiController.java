@@ -67,6 +67,13 @@ public class SearchApiController {
         List<Map<String, Object>> list = searchService.getTop6AlbumByCategory1(category1Id);
         return Result.ok(list);
     }
+
+    @Operation(summary = "根据用户已录入文本进行展示相关提示词列表，实现自动补全")
+    @GetMapping("/albumInfo/completeSuggest/{keyword}")
+    public Result<List<String>> completeSuggest(@PathVariable String keyword) {
+        List<String> list = searchService.completeSuggest(keyword);
+        return Result.ok(list);
+    }
 }
 
 

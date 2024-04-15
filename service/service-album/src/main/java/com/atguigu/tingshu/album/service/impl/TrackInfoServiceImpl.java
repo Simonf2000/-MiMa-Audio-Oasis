@@ -189,6 +189,26 @@ public class TrackInfoServiceImpl extends ServiceImpl<TrackInfoMapper, TrackInfo
         //1.获取指定专辑下包含声音分页列表（不考虑付费标识 AlbumTrackListVo中付费标识：false）
         pageInfo = trackInfoMapper.getAlbumTrackPage(pageInfo, albumId);
         //2.TODO 根据用户登录状态、身份、专辑付费类型、购买情况综合判断付费标识
+        //2. 根据专辑ID查询专辑信息-获取专辑付费类型-付费类型: 0101-免费、0102-vip免费、0103-付费
+        AlbumInfo albumInfo = albumInfoMapper.selectById(albumId);
+        //2.1 获取专辑付费类型
+        String payType = albumInfo.getPayType();
+        //2.2 获取专辑免费试听集数
+        Integer tracksForFreeCount = albumInfo.getTracksForFree();
+
+        //3. 处理用户未登录情况
+        if (userId == null) {
+            //3.1 判断专辑付费类型是否为VIP免费或者付费
+            if (SystemConstant.ALBUM_PAY_TYPE_VIPFREE.equals(payType) || SystemConstant.ALBUM_PAY_TYPE_REQUIRE.equals(payType)) {
+                //3.2 将本页中声音列表除去免费试听声音将声音付费标识设置为：true
+                pageInfo.getRecords()
+                        .stream()
+                        .filter(albumTrackListVo -> albumTrackListVo.getOrderNum() > tracksForFreeCount) //去除免费试听声音
+                        .forEach(albumTrackListVo -> {
+                            albumTrackListVo.setIsShowPaidMark(true);
+                        });
+            }
+        }
         return pageInfo;
     }
 }

@@ -40,5 +40,25 @@
           and order_num > #{orderNum}
     </update>
 
+    <!--分页展示专辑下声音列表-->
+    <select id="getAlbumTrackPage" resultType="com.atguigu.tingshu.vo.album.AlbumTrackListVo">
+        select
+            ti.id trackId,
+            ti.track_title,
+            ti.cover_url,
+            ti.media_duration,
+            ti.order_num,
+            ti.create_time,
+            max(if(ts.stat_type='0701', ts.stat_num, 0)) playStatNum,
+            max(if(ts.stat_type='0702', ts.stat_num, 0)) collectStatNum,
+            max(if(ts.stat_type='0703', ts.stat_num, 0)) praiseStatNum,
+            max(if(ts.stat_type='0704', ts.stat_num, 0)) commentStatNum
+        from track_info ti inner join track_stat ts
+                                      on ts.track_id = ti.id
+        where ti.album_id = #{albumId} and ti.is_deleted = 0
+        group by ti.id
+        order by order_num asc
+    </select>
+
 </mapper>
 

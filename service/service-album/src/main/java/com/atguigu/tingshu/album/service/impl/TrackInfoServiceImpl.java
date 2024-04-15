@@ -14,6 +14,7 @@ import com.atguigu.tingshu.model.album.AlbumInfo;
 import com.atguigu.tingshu.model.album.TrackInfo;
 import com.atguigu.tingshu.model.album.TrackStat;
 import com.atguigu.tingshu.query.album.TrackInfoQuery;
+import com.atguigu.tingshu.vo.album.AlbumTrackListVo;
 import com.atguigu.tingshu.vo.album.TrackInfoVo;
 import com.atguigu.tingshu.vo.album.TrackListVo;
 import com.atguigu.tingshu.vo.album.TrackMediaInfoVo;
@@ -172,5 +173,22 @@ public class TrackInfoServiceImpl extends ServiceImpl<TrackInfoMapper, TrackInfo
         }
         //更新声音信息
         trackInfoMapper.updateById(trackInfo);
+    }
+
+    /**
+     * 分页展示专辑下声音列表-动态显示付费标识
+     * 根据用户登录状态、身份、专辑付费类型、购买情况综合判断付费标识
+     *
+     * @param pageInfo 分页对象
+     * @param userId   用户ID
+     * @param albumId  专辑ID
+     * @return
+     */
+    @Override
+    public Page<AlbumTrackListVo> getAlbumTrackPage(Page<AlbumTrackListVo> pageInfo, Long userId, Long albumId) {
+        //1.获取指定专辑下包含声音分页列表（不考虑付费标识 AlbumTrackListVo中付费标识：false）
+        pageInfo = trackInfoMapper.getAlbumTrackPage(pageInfo, albumId);
+        //2.TODO 根据用户登录状态、身份、专辑付费类型、购买情况综合判断付费标识
+        return pageInfo;
     }
 }

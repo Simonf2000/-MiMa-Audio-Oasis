@@ -23,4 +23,6 @@ public interface SearchService {
     AlbumSearchResponseVo parseResult(SearchResponse<AlbumInfoIndex> searchResponse, AlbumIndexQuery albumIndexQuery);
 
     List<Map<String, Object>> getTop6AlbumByCategory1(Long category1Id);
+
+    void saveSuggestDoc(AlbumInfoIndex albumInfoIndex);
 }

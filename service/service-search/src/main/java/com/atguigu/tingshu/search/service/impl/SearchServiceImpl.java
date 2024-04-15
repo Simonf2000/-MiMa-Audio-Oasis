@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.RandomUtil;
+import cn.hutool.extra.pinyin.PinyinUtil;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch._types.SortOrder;
@@ -23,8 +24,10 @@ import com.atguigu.tingshu.model.album.BaseCategory3;
 import com.atguigu.tingshu.model.album.BaseCategoryView;
 import com.atguigu.tingshu.model.search.AlbumInfoIndex;
 import com.atguigu.tingshu.model.search.AttributeValueIndex;
+import com.atguigu.tingshu.model.search.SuggestIndex;
 import com.atguigu.tingshu.query.search.AlbumIndexQuery;
 import com.atguigu.tingshu.search.AlbumInfoIndexRepository;
+import com.atguigu.tingshu.search.repository.SuggestIndexRepository;
 import com.atguigu.tingshu.search.service.SearchService;
 import com.atguigu.tingshu.user.client.UserFeignClient;
 import com.atguigu.tingshu.vo.search.AlbumInfoIndexVo;
@@ -33,6 +36,7 @@ import com.atguigu.tingshu.vo.user.UserInfoVo;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.elasticsearch.core.suggest.Completion;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -67,6 +71,9 @@ public class SearchServiceImpl implements SearchService {
 
     @Autowired
     private static final String INDEX_NAME = "albuminfo";
+
+    @Autowired
+    private SuggestIndexRepository suggestIndexRepository;
 
     /**
      * 将指定专辑封装专辑索引库文档对象，完成文档信息
@@ -143,11 +150,16 @@ public class SearchServiceImpl implements SearchService {
         //5.调用文档持久层接口保存专辑
         albumInfoIndexRepository.save(albumInfoIndex);
         System.out.println(Thread.currentThread().getName() + "主线程执行");
+
+        //TODO 将发布专辑名称存入提词索引库中
+        this.saveSuggestDoc(albumInfoIndex);
     }
 
     @Override
     public void lowerAlbum(Long albumId) {
         albumInfoIndexRepository.deleteById(albumId);
+        //TODO 删除题词库索引库中文档
+        suggestIndexRepository.deleteById(albumId.toString());
     }
 
     @Override
@@ -301,7 +313,7 @@ public class SearchServiceImpl implements SearchService {
             //1.3 后续解析结果方便获取三级分类对象 将三级集合转为Map Key:三级分类ID Value：三级分类对象
             Map<Long, BaseCategory3> baseCategory3Map = baseCategory3List
                     .stream()
-                    .collect(Collectors.toMap(BaseCategory3::getId, baseCategory3-> baseCategory3));
+                    .collect(Collectors.toMap(BaseCategory3::getId, baseCategory3 -> baseCategory3));
 
             //2.执行ES检索
             SearchResponse<AlbumInfoIndex> searchResponse =
@@ -344,6 +356,20 @@ public class SearchServiceImpl implements SearchService {
             log.error("[搜索服务]置顶分类热门专辑异常：", e);
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public void saveSuggestDoc(AlbumInfoIndex albumInfoIndex) {
+        SuggestIndex suggestIndex = new SuggestIndex();
+        suggestIndex.setId(albumInfoIndex.getId().toString());
+        String albumTitle = albumInfoIndex.getAlbumTitle();
+        suggestIndex.setTitle(albumTitle);
+        suggestIndex.setKeyword(new Completion(new String[]{albumTitle}));
+       String pinyin = PinyinUtil.getPinyin(albumTitle,"");
+       suggestIndex.setKeywordPinyin(new Completion(new String[]{pinyin}));
+       String firstLetter = PinyinUtil.getFirstLetter(albumTitle,"");
+       suggestIndex.setKeywordSequence(new Completion(new String[]{firstLetter}));
+        suggestIndexRepository.save(suggestIndex);
     }
 }
 

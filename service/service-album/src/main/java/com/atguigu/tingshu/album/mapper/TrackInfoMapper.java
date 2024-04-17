@@ -18,4 +18,6 @@ public interface TrackInfoMapper extends BaseMapper<TrackInfo> {
     void updateOrderNum(Long albumId, Integer orderNum);
 
     Page<AlbumTrackListVo> getAlbumTrackPage(Page<AlbumTrackListVo> pageInfo, Long albumId);
+
+    void updateStat(@Param("trackId") Long trackId, @Param("statType") String statType, @Param("count") Integer count);
 }

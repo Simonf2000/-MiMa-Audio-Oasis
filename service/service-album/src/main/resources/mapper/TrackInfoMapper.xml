@@ -60,5 +60,14 @@
         order by order_num asc
     </select>
 
+        <update id="updateStat">
+        UPDATE track_stat
+        SET stat_num = stat_num + #{count}
+        WHERE
+            track_id = ${trackId}
+          AND stat_type = ${statType}
+          AND is_deleted = 0
+    </update>
+
 </mapper>
 

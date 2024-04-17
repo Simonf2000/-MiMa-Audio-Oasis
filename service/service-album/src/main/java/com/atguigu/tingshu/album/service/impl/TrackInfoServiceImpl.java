@@ -8,6 +8,7 @@ import com.atguigu.tingshu.album.mapper.TrackInfoMapper;
 import com.atguigu.tingshu.album.mapper.TrackStatMapper;
 import com.atguigu.tingshu.album.service.TrackInfoService;
 import com.atguigu.tingshu.album.service.VodService;
+import com.atguigu.tingshu.common.constant.RedisConstant;
 import com.atguigu.tingshu.common.constant.SystemConstant;
 import com.atguigu.tingshu.common.execption.GuiguException;
 import com.atguigu.tingshu.common.util.UploadFileUtil;
@@ -16,10 +17,7 @@ import com.atguigu.tingshu.model.album.TrackInfo;
 import com.atguigu.tingshu.model.album.TrackStat;
 import com.atguigu.tingshu.query.album.TrackInfoQuery;
 import com.atguigu.tingshu.user.client.UserFeignClient;
-import com.atguigu.tingshu.vo.album.AlbumTrackListVo;
-import com.atguigu.tingshu.vo.album.TrackInfoVo;
-import com.atguigu.tingshu.vo.album.TrackListVo;
-import com.atguigu.tingshu.vo.album.TrackMediaInfoVo;
+import com.atguigu.tingshu.vo.album.*;
 import com.atguigu.tingshu.vo.user.UserInfoVo;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -29,6 +27,7 @@ import com.qcloud.vod.model.VodUploadRequest;
 import com.qcloud.vod.model.VodUploadResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -38,6 +37,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -65,6 +65,9 @@ public class TrackInfoServiceImpl extends ServiceImpl<TrackInfoMapper, TrackInfo
 
     @Autowired
     private UserFeignClient userFeignClient;
+
+    @Autowired
+    private RedisTemplate redisTemplate;
 
     @Override
     public Map<String, String> uploadTrack(MultipartFile trackFile) {
@@ -265,5 +268,35 @@ public class TrackInfoServiceImpl extends ServiceImpl<TrackInfoMapper, TrackInfo
             }
         }
         return pageInfo;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateTrackStat(TrackStatMqVo trackStatMqVo) {
+        //1.避免同一个统计消息被重复消息，利用Redis命令set k v [ex][nx]某次统计消息只有第一次能存入成功
+        //1.1 创建key
+        String key = RedisConstant.BUSINESS_PREFIX + "album:" + trackStatMqVo.getBusinessNo();
+        //1.2 尝试存入redis
+        Boolean flag = redisTemplate.opsForValue().setIfAbsent(key, "", 10, TimeUnit.MINUTES);
+        if (flag) {
+            try {
+                //2.更新声音统计信息
+                trackInfoMapper.updateStat(trackStatMqVo.getTrackId(), trackStatMqVo.getStatType(), trackStatMqVo.getCount());
+
+                //3.更新专辑统计信息 当前方法当声音统计操作发生后才会被调用，专辑中存在跟声音相同统计类型：播放量，评论量
+                if(SystemConstant.TRACK_STAT_PLAY.equals(trackStatMqVo.getStatType())){
+                    //3.1 同时更新专辑播放量
+                    albumInfoMapper.updateStat(trackStatMqVo.getAlbumId(), SystemConstant.ALBUM_STAT_PLAY, trackStatMqVo.getCount());
+                }
+                if(SystemConstant.TRACK_STAT_COMMENT.equals(trackStatMqVo.getStatType())){
+                    //3.2 同时更新专辑评论量
+                    albumInfoMapper.updateStat(trackStatMqVo.getAlbumId(), SystemConstant.ALBUM_STAT_COMMENT, trackStatMqVo.getCount());
+                }
+            } catch (Exception e) {
+                //4.如果更新统计发生异常，确保消费者重试能够再次setnx到Redis成功
+                redisTemplate.delete(key);
+                throw new RuntimeException(e);
+            }
+        }
     }
 }

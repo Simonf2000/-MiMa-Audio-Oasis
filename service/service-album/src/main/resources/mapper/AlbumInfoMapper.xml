@@ -44,5 +44,14 @@
         from album_stat where album_id = #{albumId} and is_deleted = 0
         group by album_id
     </select>
+
+        <update id="updateStat">
+        UPDATE album_stat
+        SET stat_num = stat_num + #{count}
+        WHERE
+            album_id = #{albumId}
+          AND stat_type = #{statType}
+          AND is_deleted = 0
+    </update>
 </mapper>
 

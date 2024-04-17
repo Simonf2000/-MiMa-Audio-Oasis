@@ -15,4 +15,6 @@ public interface AlbumInfoMapper extends BaseMapper<AlbumInfo> {
     Page<AlbumListVo> getUserAlbumPage(Page<AlbumListVo> pageInfo,@Param("vo") AlbumInfoQuery albumInfoQuery);
 
     AlbumStatVo getAlbumStatVo(Long albumId);
+
+    void updateStat(@Param("albumId") Long albumId, @Param("statType") String statType, @Param("count") Integer count);
 }

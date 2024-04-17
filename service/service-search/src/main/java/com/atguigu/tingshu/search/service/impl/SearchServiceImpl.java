@@ -20,10 +20,8 @@ import co.elastic.clients.elasticsearch.core.search.HitsMetadata;
 import co.elastic.clients.elasticsearch.core.search.Suggestion;
 import com.alibaba.fastjson.JSON;
 import com.atguigu.tingshu.album.AlbumFeignClient;
-import com.atguigu.tingshu.model.album.AlbumAttributeValue;
-import com.atguigu.tingshu.model.album.AlbumInfo;
-import com.atguigu.tingshu.model.album.BaseCategory3;
-import com.atguigu.tingshu.model.album.BaseCategoryView;
+import com.atguigu.tingshu.common.constant.RedisConstant;
+import com.atguigu.tingshu.model.album.*;
 import com.atguigu.tingshu.model.search.AlbumInfoIndex;
 import com.atguigu.tingshu.model.search.AttributeValueIndex;
 import com.atguigu.tingshu.model.search.SuggestIndex;
@@ -39,6 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.elasticsearch.core.suggest.Completion;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -78,6 +77,9 @@ public class SearchServiceImpl implements SearchService {
 
     @Autowired
     private SuggestIndexRepository suggestIndexRepository;
+
+    @Autowired
+    private RedisTemplate redisTemplate;
 
     /**
      * 将指定专辑封装专辑索引库文档对象，完成文档信息
@@ -369,10 +371,10 @@ public class SearchServiceImpl implements SearchService {
         String albumTitle = albumInfoIndex.getAlbumTitle();
         suggestIndex.setTitle(albumTitle);
         suggestIndex.setKeyword(new Completion(new String[]{albumTitle}));
-       String pinyin = PinyinUtil.getPinyin(albumTitle,"");
-       suggestIndex.setKeywordPinyin(new Completion(new String[]{pinyin}));
-       String firstLetter = PinyinUtil.getFirstLetter(albumTitle,"");
-       suggestIndex.setKeywordSequence(new Completion(new String[]{firstLetter}));
+        String pinyin = PinyinUtil.getPinyin(albumTitle, "");
+        suggestIndex.setKeywordPinyin(new Completion(new String[]{pinyin}));
+        String firstLetter = PinyinUtil.getFirstLetter(albumTitle, "");
+        suggestIndex.setKeywordSequence(new Completion(new String[]{firstLetter}));
         suggestIndexRepository.save(suggestIndex);
     }
 
@@ -452,6 +454,64 @@ public class SearchServiceImpl implements SearchService {
             }
         }
         return list;
+    }
+
+    @Override
+    public void updateLatelyAlbumRanking() {
+        try {
+            //1.远程调用专辑服务获取所有1级分类ID
+            List<BaseCategory1> baseCategory1List = albumFeignClient.getAllCategory1().getData();
+            if (CollectionUtil.isNotEmpty(baseCategory1List)) {
+                List<Long> baseCategory1IdList = baseCategory1List.
+                        stream()
+                        .map(BaseCategory1::getId)
+                        .collect(Collectors.toList());
+                //2.遍历1级分类列表
+                String[] rankingDimensionArray = new String[]{"hotScore", "playStatNum", "subscribeStatNum", "buyStatNum", "commentStatNum"};
+                for (Long baseCategoryId : baseCategory1IdList) {
+                    //3.遍历不同排序方式：每个分类下五种排序字段TOP10列表，放入Redis
+                    for (String dimension : rankingDimensionArray) {
+                        //3.1 查询指定1级下某个排序方式TOP10列表
+                        SearchResponse<AlbumInfoIndex> searchResponse = elasticsearchClient
+                                .search(
+                                        s -> s.index(INDEX_NAME)
+                                                .query(q -> q.term(t -> t.field("category1Id").value(baseCategoryId)))
+                                                .size(10)
+                                                .sort(sort -> sort.field(f -> f.field(dimension).order(SortOrder.Desc)))
+                                                .source(source -> source.filter(f -> f.excludes(Arrays.asList("isFinished", "category1Id", "category2Id", "category3Id", "hotScore", "attributeValueIndexList.attributeId", "attributeValueIndexList.valueId")))),
+                                        AlbumInfoIndex.class
+                                );
+                        //3.2 解析ES响应结果
+                        List<Hit<AlbumInfoIndex>> hitList = searchResponse.hits().hits();
+                        if (CollectionUtil.isNotEmpty(hitList)) {
+                            List<AlbumInfoIndex> top10List = hitList.stream()
+                                    .map(hit -> hit.source())
+                                    .collect(Collectors.toList());
+
+                            //3.3 将查询到列表数据放入到Redis中Hash
+                            //3.3.1 构建排行榜Hash的KEY
+                            String key = RedisConstant.RANKING_KEY_PREFIX + baseCategoryId;
+                            //3.3.2 构建排行榜Hash的field(hash key)
+                            String field = dimension;
+                            //3.3.3 将TOP10列表放入Hash中Value
+                            redisTemplate.opsForHash().put(key, field, top10List);
+                        }
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.error("[搜索服务]查询ES更新Redis中TOP10排行榜异常：", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public List<AlbumInfoIndex> getRankingList(Long category1Id, String dimension) {
+        //3.3.1 构建排行榜Hash的KEY
+        String key = RedisConstant.RANKING_KEY_PREFIX + category1Id;
+        //3.3.2 构建排行榜Hash的field(hash key)
+        String field = dimension;
+        return (List<AlbumInfoIndex>) redisTemplate.opsForHash().get(key, field);
     }
 }
 

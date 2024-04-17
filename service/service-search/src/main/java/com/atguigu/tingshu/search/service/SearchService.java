@@ -32,4 +32,8 @@ public interface SearchService {
     List<String> completeSuggest(String keyword);
 
     Collection<String> parseSuggestResult(String s, Map<String, List<Suggestion<SuggestIndex>>> suggestMap);
+
+    void updateLatelyAlbumRanking();
+
+    List<AlbumInfoIndex> getRankingList(Long category1Id, String dimension);
 }

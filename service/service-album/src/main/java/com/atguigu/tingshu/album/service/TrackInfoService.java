@@ -5,6 +5,7 @@ import com.atguigu.tingshu.query.album.TrackInfoQuery;
 import com.atguigu.tingshu.vo.album.AlbumTrackListVo;
 import com.atguigu.tingshu.vo.album.TrackInfoVo;
 import com.atguigu.tingshu.vo.album.TrackListVo;
+import com.atguigu.tingshu.vo.album.TrackStatMqVo;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,4 +27,6 @@ public interface TrackInfoService extends IService<TrackInfo> {
     void updateTrackInfo(TrackInfo trackInfo);
 
     Page<AlbumTrackListVo> getAlbumTrackPage(Page<AlbumTrackListVo> pageInfo, Long userId, Long albumId);
+
+    void updateTrackStat(TrackStatMqVo trackStatMqVo);
 }
